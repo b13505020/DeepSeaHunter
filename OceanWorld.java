@@ -30,7 +30,9 @@ public class OceanWorld extends JPanel {
     private boolean isFacingLeft = false; 
 
     // --- 武器資訊 (補回顯示邏輯) ---
-    private Weapon currentWeapon = new Weapon("初級魚槍", 1, 600);
+    private ArrayList<Weapon> weaponList = new ArrayList<>();
+    private int currentWeaponIndex = 0;
+    private Weapon currentWeapon;
     private ArrayList<Bullet> bullets = new ArrayList<>();
     private ArrayList<OceanFish> fishList = new ArrayList<>();
 
@@ -44,6 +46,7 @@ public class OceanWorld extends JPanel {
         setFocusable(true);
         setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         loadImages();
+        setupWeapons();
         resetPlayerPosition(); 
         setupButtons();
         setupControls();
@@ -73,6 +76,19 @@ public class OceanWorld extends JPanel {
             System.out.println("❌ 圖片載入失敗");
         }
     }
+    private void switchWeapon(int direction) {
+        if (weaponList.isEmpty()) return;
+    
+        currentWeaponIndex += direction;
+    
+        if (currentWeaponIndex < 0) {
+            currentWeaponIndex = weaponList.size() - 1;
+        } else if (currentWeaponIndex >= weaponList.size()) {
+            currentWeaponIndex = 0;
+        }
+    
+        currentWeapon = weaponList.get(currentWeaponIndex);
+    }
 
     private void setupButtons() {
         JButton bagBtn = new JButton("Backpack");
@@ -98,6 +114,8 @@ public class OceanWorld extends JPanel {
                 else if (code == KeyEvent.VK_UP) upPressed = true;
                 else if (code == KeyEvent.VK_DOWN) downPressed = true;
                 else if (code == KeyEvent.VK_SPACE) fire();
+                else if (code == KeyEvent.VK_Q) switchWeapon(-1);
+                else if (code == KeyEvent.VK_E) switchWeapon(1);
             }
             @Override
             public void keyReleased(KeyEvent e) {
@@ -120,7 +138,21 @@ public class OceanWorld extends JPanel {
         gameTimer = new Timer(16, e -> { if (isShowing()) { updateGame(backToLandAction); repaint(); } });
         gameTimer.start();
     }
-
+    private void setupWeapons() {
+        weaponList.clear();
+    
+        weaponList.add(new Weapon("初級魚槍", 1, 600));
+        weaponList.add(new Weapon("水下步槍", 2, 750));
+        weaponList.add(new Weapon("狙擊槍", 6, 1300));
+        weaponList.add(new Weapon("網槍", 1, 500));
+        weaponList.add(new Weapon("睡眠槍", 1, 650));
+        weaponList.add(new Weapon("麻醉槍", 1, 650));
+        weaponList.add(new Weapon("榴彈發射器", 8, 450));
+        weaponList.add(new Weapon("寒冰槍", 2, 700));
+    
+        currentWeaponIndex = 0;
+        currentWeapon = weaponList.get(currentWeaponIndex);
+    }
     private void spawnFish() {
         fishList.clear();
         String[][] data = {

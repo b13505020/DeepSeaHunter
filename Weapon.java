@@ -9,7 +9,15 @@ public class Weapon {
         this.range = range;
     }
 
-    public String getName() { return name; }
-    public int getDamage() { return damage; }
-    public int getRange() { return range; }
+    public String getName() {
+        return name;
+    }
+
+    public int getDamage() {
+        return damage;
+    }
+
+    public int getRange() {
+        return range;
+    }
 }
