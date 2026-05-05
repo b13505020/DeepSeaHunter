@@ -24,7 +24,13 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
 
     private final double SPEED = 6.0;
 
-    private Rectangle equipmentZone = new Rectangle(20, 450, 180, 350);
+    private Rectangle[] shopZones = {
+        new Rectangle(0, 230, 240, 270),
+        new Rectangle(180, 240, 220, 260),
+        new Rectangle(70, 180, 260, 90),
+        new Rectangle(250, 260, 150, 230)
+    };
+
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
 
     private ActionListener onDive;
@@ -127,6 +133,15 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         playerY = Math.max(0, Math.min(playerY, 900 - PLAYER_HEIGHT));
     }
 
+    private boolean isInShopZone(Rectangle playerRect) {
+        for (Rectangle zone : shopZones) {
+            if (playerRect.intersects(zone)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -188,7 +203,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 22));
 
-        if (pRect.intersects(equipmentZone)) {
+        if (isInShopZone(pRect)) {
             g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
         } else if (pRect.intersects(diveZone)) {
             g.drawString("Press ENTER to Dive", (int) playerX - 30, (int) playerY - 20);
@@ -223,7 +238,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 PLAYER_HEIGHT
             );
 
-            if (pRect.intersects(equipmentZone)) {
+            if (isInShopZone(pRect)) {
                 onEnterShop.actionPerformed(null);
             } else if (pRect.intersects(diveZone)) {
                 onDive.actionPerformed(null);
