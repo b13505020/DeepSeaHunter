@@ -12,6 +12,7 @@ public class GameLauncher extends JFrame {
 
     private LandWorld landPanel;
     private OceanWorld oceanPanel;
+    private GearShopScreen gearShopPanel;
 
     public static final int WIN_WIDTH = 1600;
     public static final int WIN_HEIGHT = 900;
@@ -23,29 +24,40 @@ public class GameLauncher extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
+        oceanPanel = new OceanWorld(e -> {
+            cardLayout.show(mainPanel, "LandScreen");
+            SwingUtilities.invokeLater(() -> {
+                landPanel.resetPlayerPosition();
+                landPanel.requestFocusInWindow();
+            });
+        });
+
+        gearShopPanel = new GearShopScreen(e -> {
+            cardLayout.show(mainPanel, "LandScreen");
+            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+        });
+
         landPanel = new LandWorld(
             e -> {
+                oceanPanel.resetPlayerPosition();
                 cardLayout.show(mainPanel, "OceanScreen");
                 SwingUtilities.invokeLater(() -> oceanPanel.requestFocusInWindow());
             },
             e -> {
-                new ShopView();
-                SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+                cardLayout.show(mainPanel, "GearShopScreen");
+                SwingUtilities.invokeLater(() -> gearShopPanel.requestFocusInWindow());
             }
         );
-
-        oceanPanel = new OceanWorld(e -> {
-            cardLayout.show(mainPanel, "LandScreen");
-            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
-        });
 
         JPanel titlePanel = createTitlePanel();
 
         mainPanel.add(titlePanel, "TitleScreen");
         mainPanel.add(landPanel, "LandScreen");
         mainPanel.add(oceanPanel, "OceanScreen");
+        mainPanel.add(gearShopPanel, "GearShopScreen");
 
         add(mainPanel);
+
         cardLayout.show(mainPanel, "TitleScreen");
 
         setVisible(true);
@@ -75,9 +87,13 @@ public class GameLauncher extends JFrame {
                 startBtn.setBackground(new Color(20, 50, 70));
                 startBtn.setForeground(new Color(0, 255, 255));
                 startBtn.setFocusPainted(false);
-                startBtn.setBorder(BorderFactory.createLineBorder(new Color(0, 255, 255), 4));
+                startBtn.setBorder(
+                    BorderFactory.createLineBorder(
+                        new Color(0, 255, 255),
+                        4
+                    )
+                );
 
-                // 封面按鈕的自訂箭頭游標
                 startBtn.setCursor(handCursor);
 
                 startBtn.addActionListener(e -> {
@@ -109,12 +125,21 @@ public class GameLauncher extends JFrame {
                     );
 
                     Graphics2D g2 = cursorImage.createGraphics();
+
                     g2.setRenderingHint(
                         RenderingHints.KEY_INTERPOLATION,
                         RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                     );
 
-                    g2.drawImage(originalImage, 0, 0, cursorWidth, cursorHeight, null);
+                    g2.drawImage(
+                        originalImage,
+                        0,
+                        0,
+                        cursorWidth,
+                        cursorHeight,
+                        null
+                    );
+
                     g2.dispose();
 
                     return Toolkit.getDefaultToolkit().createCustomCursor(
@@ -135,7 +160,14 @@ public class GameLauncher extends JFrame {
                 super.paintComponent(g);
 
                 if (coverImg != null) {
-                    g.drawImage(coverImg, 0, 0, getWidth(), getHeight(), this);
+                    g.drawImage(
+                        coverImg,
+                        0,
+                        0,
+                        getWidth(),
+                        getHeight(),
+                        this
+                    );
                 } else {
                     g.setColor(new Color(0, 30, 80));
                     g.fillRect(0, 0, getWidth(), getHeight());

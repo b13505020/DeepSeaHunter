@@ -24,7 +24,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
 
     private final double SPEED = 6.0;
 
-    private Rectangle equipmentZone = new Rectangle(20, 450, 180, 350);
+    private Rectangle equipmentZone = new Rectangle(45, 350, 150, 130);
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
 
     private ActionListener onDive;
