@@ -1,3 +1,8 @@
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,6 +22,10 @@ public class InventoryManager {
     private static int backpackLevel = 1;
 
     private static final int MAX_LEVEL = 3;
+
+    // 存檔位置
+    private static final String SAVE_FOLDER = "saves";
+    private static final String SAVE_FILE = SAVE_FOLDER + "/deepsea_save.dat";
 
     // =========================
     // 金錢相關
@@ -39,7 +48,6 @@ public class InventoryManager {
         return true;
     }
 
-    // 賣掉一隻魚
     public static int sellFish(Fish fish) {
         if (storageList.remove(fish)) {
             money += fish.getPrice();
@@ -49,7 +57,6 @@ public class InventoryManager {
         return 0;
     }
 
-    // 賣掉玩家選取的多隻魚
     public static int sellSelectedFish(List<Fish> selectedFish) {
         int total = 0;
 
@@ -63,7 +70,6 @@ public class InventoryManager {
         return total;
     }
 
-    // 賣掉全部儲藏箱裡的魚
     public static int sellAllStorageFish() {
         int total = 0;
 
@@ -77,7 +83,6 @@ public class InventoryManager {
         return total;
     }
 
-    // 計算儲藏箱魚的總價值
     public static int getStorageValue() {
         int total = 0;
 
@@ -92,23 +97,19 @@ public class InventoryManager {
     // 背包 / 儲藏箱相關
     // =========================
 
-    // 為了相容 BackpackView
     public static List<Fish> getMyBackpack() {
         return currentDiveList;
     }
 
-    // 成功上岸時呼叫：本次潛水的魚轉移到永久儲藏箱
     public static void moveToStorage() {
         storageList.addAll(currentDiveList);
         currentDiveList.clear();
     }
 
-    // 氧氣耗盡或失敗時呼叫：清空本次潛水背包
     public static void clearCurrentDive() {
         currentDiveList.clear();
     }
 
-    // 抓到魚時呼叫：會檢查背包容量
     public static boolean addFish(Fish fish) {
         if (currentDiveList.size() >= getBackpackCapacity()) {
             return false;
@@ -118,18 +119,14 @@ public class InventoryManager {
         return true;
     }
 
-    // 取得永久儲藏箱
     public static List<Fish> getStorage() {
         return storageList;
     }
 
-    // 保留舊方法名稱，避免其他檔案出錯
     public static List<Fish> getInventory() {
         return storageList;
     }
 
-    // 總資產價值：背包 + 儲藏箱
-    // 注意：這不是玩家可以花的錢，只是目前魚的總價值
     public static int getTotalPrice() {
         int total = 0;
 
@@ -164,24 +161,39 @@ public class InventoryManager {
     // 裝備效果
     // =========================
 
-    // 氧氣瓶：影響下水秒數
     public static double getMaxOxygenTime() {
-        if (oxygenLevel == 1) return 60.0;
-        if (oxygenLevel == 2) return 90.0;
+        if (oxygenLevel == 1) {
+            return 60.0;
+        }
+
+        if (oxygenLevel == 2) {
+            return 90.0;
+        }
+
         return 120.0;
     }
 
-    // 潛水衣：影響最大可下潛深度
     public static int getMaxDepth() {
-        if (suitLevel == 1) return 800;
-        if (suitLevel == 2) return 1500;
+        if (suitLevel == 1) {
+            return 800;
+        }
+
+        if (suitLevel == 2) {
+            return 1500;
+        }
+
         return 2400;
     }
 
-    // 背包：影響一次潛水能帶幾隻魚
     public static int getBackpackCapacity() {
-        if (backpackLevel == 1) return 5;
-        if (backpackLevel == 2) return 8;
+        if (backpackLevel == 1) {
+            return 5;
+        }
+
+        if (backpackLevel == 2) {
+            return 8;
+        }
+
         return 12;
     }
 
@@ -190,20 +202,38 @@ public class InventoryManager {
     // =========================
 
     public static int getOxygenUpgradeCost() {
-        if (oxygenLevel == 1) return 500;
-        if (oxygenLevel == 2) return 1200;
+        if (oxygenLevel == 1) {
+            return 500;
+        }
+
+        if (oxygenLevel == 2) {
+            return 1200;
+        }
+
         return -1;
     }
 
     public static int getSuitUpgradeCost() {
-        if (suitLevel == 1) return 800;
-        if (suitLevel == 2) return 1800;
+        if (suitLevel == 1) {
+            return 800;
+        }
+
+        if (suitLevel == 2) {
+            return 1800;
+        }
+
         return -1;
     }
 
     public static int getBackpackUpgradeCost() {
-        if (backpackLevel == 1) return 600;
-        if (backpackLevel == 2) return 1500;
+        if (backpackLevel == 1) {
+            return 600;
+        }
+
+        if (backpackLevel == 2) {
+            return 1500;
+        }
+
         return -1;
     }
 
@@ -254,5 +284,121 @@ public class InventoryManager {
 
         backpackLevel++;
         return true;
+    }
+
+    // =========================
+    // 存檔 / 讀檔 / 新遊戲
+    // =========================
+
+    public static boolean hasSaveFile() {
+        File file = new File(SAVE_FILE);
+        return file.exists() && file.isFile();
+    }
+
+    public static boolean saveGame() {
+        try {
+            File folder = new File(SAVE_FOLDER);
+
+            if (!folder.exists()) {
+                folder.mkdirs();
+            }
+
+            SaveData data = new SaveData();
+
+            data.money = money;
+            data.oxygenLevel = oxygenLevel;
+            data.suitLevel = suitLevel;
+            data.backpackLevel = backpackLevel;
+
+            data.storageList = new ArrayList<>(storageList);
+            data.currentDiveList = new ArrayList<>(currentDiveList);
+
+            data.unlockedFish = CollectionManager.getUnlockedFishSnapshot();
+
+            ObjectOutputStream out = new ObjectOutputStream(
+                new FileOutputStream(SAVE_FILE)
+            );
+
+            out.writeObject(data);
+            out.close();
+
+            System.out.println("✅ 遊戲已自動存檔：" + SAVE_FILE);
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("❌ 存檔失敗");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static boolean loadGame() {
+        if (!hasSaveFile()) {
+            return false;
+        }
+
+        try {
+            ObjectInputStream in = new ObjectInputStream(
+                new FileInputStream(SAVE_FILE)
+            );
+
+            SaveData data = (SaveData) in.readObject();
+            in.close();
+
+            money = data.money;
+
+            oxygenLevel = clampLevel(data.oxygenLevel);
+            suitLevel = clampLevel(data.suitLevel);
+            backpackLevel = clampLevel(data.backpackLevel);
+
+            if (data.storageList != null) {
+                storageList = new ArrayList<>(data.storageList);
+            } else {
+                storageList = new ArrayList<>();
+            }
+
+            if (data.currentDiveList != null) {
+                currentDiveList = new ArrayList<>(data.currentDiveList);
+            } else {
+                currentDiveList = new ArrayList<>();
+            }
+
+            CollectionManager.setUnlockedFish(data.unlockedFish);
+
+            System.out.println("✅ 讀取存檔成功：" + SAVE_FILE);
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("❌ 讀取存檔失敗");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static void resetGame() {
+        storageList.clear();
+        currentDiveList.clear();
+
+        money = 0;
+
+        oxygenLevel = 1;
+        suitLevel = 1;
+        backpackLevel = 1;
+
+        CollectionManager.resetUnlockedFish();
+
+        System.out.println("已建立新遊戲資料");
+    }
+
+    private static int clampLevel(int level) {
+        if (level < 1) {
+            return 1;
+        }
+
+        if (level > MAX_LEVEL) {
+            return MAX_LEVEL;
+        }
+
+        return level;
     }
 }

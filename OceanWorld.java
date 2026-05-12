@@ -404,15 +404,61 @@ public class OceanWorld extends JPanel {
                     fishList.remove(i);
                 } else {
                     JOptionPane.showMessageDialog(
-                        this,
-                        "背包已滿！請先返回陸地結算，或去商店升級背包。"
-                    );
+                      this,
+                     "背包已滿！請先返回陸地結算，或去商店升級背包。"
+                     );
+
+                    // 背包滿時，把玩家稍微推離這隻魚，避免一直觸發碰撞視窗
+                    pushPlayerAwayFromFish(f);
+
+                    requestFocusInWindow();
                 }
 
                 break;
             }
         }
     }
+    private void pushPlayerAwayFromFish(OceanFish f) {
+    Rectangle fishRect = f.getBounds();
+
+    double playerCenterX = playerX + PLAYER_WIDTH / 2.0;
+    double playerCenterY = playerY + PLAYER_HEIGHT / 2.0;
+
+    double fishCenterX = fishRect.getCenterX();
+    double fishCenterY = fishRect.getCenterY();
+
+    double dx = playerCenterX - fishCenterX;
+    double dy = playerCenterY - fishCenterY;
+
+    double distance = Math.sqrt(dx * dx + dy * dy);
+
+    // 如果剛好中心重疊，就預設往上推
+    if (distance == 0) {
+        dx = 0;
+        dy = -1;
+        distance = 1;
+    }
+
+    dx /= distance;
+    dy /= distance;
+
+    // 推開距離，可以自己調大或調小
+    double pushDistance = 220;
+
+    playerX += dx * pushDistance;
+    playerY += dy * pushDistance;
+
+    // 限制玩家不要被推出地圖外
+    playerX = clamp(playerX, 0, worldWidth - PLAYER_WIDTH);
+
+    int maxDepth = InventoryManager.getMaxDepth();
+    double maxYBySuit = 400 + maxDepth;
+    double maxYByMap = worldHeight - PLAYER_HEIGHT;
+
+    playerY = clamp(playerY, 400, Math.min(maxYBySuit, maxYByMap));
+
+    updateCamera();
+}
 
     private void checkSurfaceInteraction(ActionListener backAction) {
         if (isShowingReturnDialog) {

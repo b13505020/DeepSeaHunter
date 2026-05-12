@@ -4,20 +4,62 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Random;
 import javax.imageio.ImageIO;
 
 public class GearShopScreen extends JPanel {
     private BufferedImage shopBg;
+    private BufferedImage bossImage;
 
     private JLabel moneyLabel;
     private JLabel infoLabel;
-    private JLabel hintLabel;
+
+    // 下面對話框文字區
+    private JTextArea messageArea;
 
     private JButton suitBtn;
     private JButton oxygenBtn;
     private JButton backpackBtn;
     private JButton sellFishBtn;
     private JButton exitBtn;
+
+    // =========================
+    // 商店老闆相關
+    // =========================
+    private JButton bossBtn;
+
+    private int bossX = 590;
+    private int bossY = 360;
+
+    private final int BOSS_WIDTH = 170;
+    private final int BOSS_HEIGHT = 270;
+
+    // 老闆左右移動範圍
+    private final int bossMinX = 555;
+    private final int bossMaxX = 700;
+
+    private int bossDirection = 1;
+    private final int bossSpeed = 1;
+
+    // 這個數字越小，老闆被櫃檯遮住越多
+    // 如果你覺得還是露太多，就改成 520 或 510
+    // 如果你覺得被切太多，就改成 550 或 560
+    private final int BOSS_CUT_Y = 570;
+
+    private Timer bossMoveTimer;
+    private Timer bossDialogTimer;
+
+    private boolean bossDialogActive = false;
+
+    private Random random = new Random();
+
+    private String[] bossDialogs = {
+        "今天想升級什麼？潛得越深，魚通常越值錢。",
+        "背包常常滿掉嗎？那你真的該先升級背包了。",
+        "氧氣就是命，海裡可不是逞強的地方。",
+        "有些魚不難抓，但值不值得帶回來，就看你的背包空間了。",
+        "錢不夠沒關係，多下海幾趟，總會翻身的。"
+    };
 
     public GearShopScreen(ActionListener backToLandAction) {
         setLayout(null);
@@ -27,9 +69,12 @@ public class GearShopScreen extends JPanel {
         loadImages();
 
         setupInfoLabels();
+        setupMessageArea();
         setupHotspotButtons(backToLandAction);
+        setupBossButton();
+        setupBossMovement();
 
-        updateShopText("點選商店中的設備區域進行升級。");
+        setBottomMessage("點選商店中的設備區域進行升級。");
     }
 
     private void loadImages() {
@@ -39,6 +84,59 @@ public class GearShopScreen extends JPanel {
             System.out.println("❌ 找不到 assets/shop_background.png");
             e.printStackTrace();
         }
+
+        try {
+            bossImage = ImageIO.read(new File("assets/shop_boss.png"));
+
+            // 如果圖片還有白色或淺灰背景，這裡會幫你轉透明
+            bossImage = removeLightBackground(bossImage);
+
+        } catch (IOException e) {
+            System.out.println("❌ 找不到 assets/shop_boss.png，將使用替代方塊顯示老闆");
+        }
+    }
+
+    // 把白色 / 淺灰色背景轉透明
+    private BufferedImage removeLightBackground(BufferedImage src) {
+        BufferedImage result = new BufferedImage(
+            src.getWidth(),
+            src.getHeight(),
+            BufferedImage.TYPE_INT_ARGB
+        );
+
+        for (int y = 0; y < src.getHeight(); y++) {
+            for (int x = 0; x < src.getWidth(); x++) {
+                int argb = src.getRGB(x, y);
+
+                int a = (argb >> 24) & 0xff;
+                int r = (argb >> 16) & 0xff;
+                int g = (argb >> 8) & 0xff;
+                int b = argb & 0xff;
+
+                if (a < 10) {
+                    result.setRGB(x, y, 0x00000000);
+                    continue;
+                }
+
+                if (isLightBackgroundPixel(r, g, b)) {
+                    result.setRGB(x, y, 0x00000000);
+                } else {
+                    result.setRGB(x, y, argb);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private boolean isLightBackgroundPixel(int r, int g, int b) {
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+
+        boolean isBright = r > 195 && g > 195 && b > 195;
+        boolean isNeutralGray = max - min < 35;
+
+        return isBright && isNeutralGray;
     }
 
     private void setupInfoLabels() {
@@ -49,16 +147,27 @@ public class GearShopScreen extends JPanel {
         add(moneyLabel);
 
         infoLabel = new JLabel();
-        infoLabel.setBounds(40, 65, 1000, 35);
+        infoLabel.setBounds(40, 65, 1250, 35);
         infoLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
         infoLabel.setForeground(new Color(180, 240, 255));
         add(infoLabel);
+    }
 
-        hintLabel = new JLabel();
-        hintLabel.setBounds(40, 805, 1200, 40);
-        hintLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
-        hintLabel.setForeground(Color.WHITE);
-        add(hintLabel);
+    private void setupMessageArea() {
+        messageArea = new JTextArea();
+        messageArea.setBounds(45, 805, 1180, 45);
+        messageArea.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
+        messageArea.setForeground(Color.WHITE);
+        messageArea.setOpaque(false);
+        messageArea.setEditable(false);
+        messageArea.setFocusable(false);
+        messageArea.setLineWrap(true);
+        messageArea.setWrapStyleWord(true);
+        add(messageArea);
+    }
+
+    private void setBottomMessage(String text) {
+        messageArea.setText(text);
     }
 
     private void setupHotspotButtons(ActionListener backToLandAction) {
@@ -75,10 +184,12 @@ public class GearShopScreen extends JPanel {
             boolean success = InventoryManager.upgradeSuit();
 
             if (success) {
-                updateShopText("潛水衣升級成功！現在可以潛得更深。");
+                setBottomMessage("潛水衣升級成功！現在可以潛得更深。");
             } else {
-                updateShopText("潛水衣升級失敗：錢不夠或已達最高等級。");
+                setBottomMessage("潛水衣升級失敗：錢不夠或已達最高等級。");
             }
+
+            updateShopText();
         });
 
         add(suitBtn);
@@ -96,10 +207,12 @@ public class GearShopScreen extends JPanel {
             boolean success = InventoryManager.upgradeOxygen();
 
             if (success) {
-                updateShopText("氧氣瓶升級成功！下次下水可以待更久。");
+                setBottomMessage("氧氣瓶升級成功！下次下水可以待更久。");
             } else {
-                updateShopText("氧氣瓶升級失敗：錢不夠或已達最高等級。");
+                setBottomMessage("氧氣瓶升級失敗：錢不夠或已達最高等級。");
             }
+
+            updateShopText();
         });
 
         add(oxygenBtn);
@@ -117,10 +230,12 @@ public class GearShopScreen extends JPanel {
             boolean success = InventoryManager.upgradeBackpack();
 
             if (success) {
-                updateShopText("背包升級成功！下次可以帶更多魚。");
+                setBottomMessage("背包升級成功！下次可以帶更多魚。");
             } else {
-                updateShopText("背包升級失敗：錢不夠或已達最高等級。");
+                setBottomMessage("背包升級失敗：錢不夠或已達最高等級。");
             }
+
+            updateShopText();
         });
 
         add(backpackBtn);
@@ -136,14 +251,15 @@ public class GearShopScreen extends JPanel {
 
         sellFishBtn.addActionListener(e -> {
             new SellFishView(() -> {
-                updateShopText("交易完成，金錢與儲藏箱已更新。");
+                setBottomMessage("交易完成，金錢與儲藏箱已更新。");
+                updateShopText();
                 repaint();
             });
         });
 
         add(sellFishBtn);
 
-        // 離開商店按鈕：放在右下角，避免破壞圖片
+        // 離開商店按鈕
         exitBtn = new JButton("返回陸地");
         exitBtn.setBounds(1360, 790, 180, 55);
         exitBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
@@ -169,19 +285,168 @@ public class GearShopScreen extends JPanel {
         btn.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                hintLabel.setText(tooltip);
+                bossDialogActive = false;
+                setBottomMessage(btn.getToolTipText());
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                hintLabel.setText("點選商店中的設備區域進行升級。");
+                if (!bossDialogActive) {
+                    setBottomMessage("點選商店中的設備區域進行升級。");
+                }
             }
         });
 
         return btn;
     }
 
-    private void updateShopText(String message) {
+    // =========================
+    // 商店老闆設定
+    // =========================
+    private void setupBossButton() {
+        bossBtn = new JButton();
+
+        bossBtn.setBounds(
+            bossX,
+            bossY,
+            BOSS_WIDTH,
+            getBossVisibleHeight()
+        );
+
+        bossBtn.setContentAreaFilled(false);
+        bossBtn.setBorderPainted(false);
+        bossBtn.setFocusPainted(false);
+        bossBtn.setOpaque(false);
+        bossBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        bossBtn.setToolTipText("和商店老闆說話");
+
+        bossBtn.addActionListener(e -> showRandomBossDialog());
+
+        bossBtn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (!bossDialogActive) {
+                    setBottomMessage("點擊老闆可以聊天。");
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (!bossDialogActive) {
+                    setBottomMessage("點選商店中的設備區域進行升級。");
+                }
+            }
+        });
+
+        add(bossBtn);
+    }
+
+    private void setupBossMovement() {
+        bossMoveTimer = new Timer(70, e -> {
+            bossX += bossDirection * bossSpeed;
+
+            if (bossX <= bossMinX) {
+                bossX = bossMinX;
+                bossDirection = 1;
+            } else if (bossX >= bossMaxX) {
+                bossX = bossMaxX;
+                bossDirection = -1;
+            }
+
+            if (bossBtn != null) {
+                bossBtn.setBounds(
+                    bossX,
+                    bossY,
+                    BOSS_WIDTH,
+                    getBossVisibleHeight()
+                );
+            }
+
+            repaint();
+        });
+
+        bossMoveTimer.start();
+    }
+
+    private int getBossVisibleHeight() {
+        return Math.max(80, BOSS_CUT_Y - bossY);
+    }
+
+    private void showRandomBossDialog() {
+        String dialog = bossDialogs[random.nextInt(bossDialogs.length)];
+
+        bossDialogActive = true;
+        setBottomMessage("老闆：「" + dialog + "」");
+
+        if (bossDialogTimer != null && bossDialogTimer.isRunning()) {
+            bossDialogTimer.stop();
+        }
+
+        bossDialogTimer = new Timer(5000, e -> {
+            bossDialogActive = false;
+            setBottomMessage("點選商店中的設備區域進行升級。");
+            repaint();
+        });
+
+        bossDialogTimer.setRepeats(false);
+        bossDialogTimer.start();
+
+        repaint();
+        requestFocusInWindow();
+    }
+
+    private void drawBoss(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g.create();
+
+        g2d.setRenderingHint(
+            RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+        );
+
+        if (bossImage != null) {
+            // 只畫出被切線以上的部分，讓老闆看起來在櫃檯裡面
+            Shape oldClip = g2d.getClip();
+
+            g2d.setClip(
+                bossX,
+                bossY,
+                BOSS_WIDTH,
+                getBossVisibleHeight()
+            );
+
+            g2d.drawImage(
+                bossImage,
+                bossX,
+                bossY,
+                BOSS_WIDTH,
+                BOSS_HEIGHT,
+                this
+            );
+
+            g2d.setClip(oldClip);
+        } else {
+            g2d.setColor(new Color(80, 55, 35));
+            g2d.fillRoundRect(
+                bossX,
+                bossY,
+                BOSS_WIDTH,
+                getBossVisibleHeight(),
+                25,
+                25
+            );
+
+            g2d.setColor(new Color(230, 190, 120));
+            g2d.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
+            g2d.drawString("商店老闆", bossX + 25, bossY + 90);
+        }
+
+        g2d.dispose();
+    }
+
+    // =========================
+    // 商店資訊更新
+    // =========================
+    private void updateShopText() {
         moneyLabel.setText("目前金錢：$" + InventoryManager.getMoney());
 
         infoLabel.setText(
@@ -190,60 +455,153 @@ public class GearShopScreen extends JPanel {
             + "　｜　氧氣瓶 Lv." + InventoryManager.getOxygenLevel()
             + " / " + String.format("%.0f", InventoryManager.getMaxOxygenTime()) + " 秒"
             + "　｜　背包 Lv." + InventoryManager.getBackpackLevel()
-            + " / 容量 " + InventoryManager.getBackpackCapacity()
+            + " / 容量 " + InventoryManager.getBackpackCapacity() + " 隻魚"
         );
-
-        hintLabel.setText(message);
 
         updateButtonTooltips();
         repaint();
     }
 
     private void updateButtonTooltips() {
+        updateSuitTooltip();
+        updateOxygenTooltip();
+        updateBackpackTooltip();
+    }
+
+    private void updateSuitTooltip() {
         if (InventoryManager.getSuitUpgradeCost() == -1) {
-            suitBtn.setToolTipText("潛水衣已達最高等級");
-        } else {
             suitBtn.setToolTipText(
-                "升級潛水衣 Lv."
-                + InventoryManager.getSuitLevel()
-                + " → Lv."
-                + (InventoryManager.getSuitLevel() + 1)
-                + "，需要 $"
-                + InventoryManager.getSuitUpgradeCost()
+                "潛水衣已達最高等級｜目前最大深度 "
+                + InventoryManager.getMaxDepth()
+                + " m"
             );
+            return;
         }
 
+        int currentLevel = InventoryManager.getSuitLevel();
+        int currentDepth = InventoryManager.getMaxDepth();
+        int nextDepth = getNextSuitDepth();
+
+        suitBtn.setToolTipText(
+            "升級潛水衣 Lv."
+            + currentLevel
+            + " → Lv."
+            + (currentLevel + 1)
+            + "｜費用 $"
+            + InventoryManager.getSuitUpgradeCost()
+            + "｜最大深度 "
+            + currentDepth
+            + " m → "
+            + nextDepth
+            + " m"
+        );
+    }
+
+    private void updateOxygenTooltip() {
         if (InventoryManager.getOxygenUpgradeCost() == -1) {
-            oxygenBtn.setToolTipText("氧氣瓶已達最高等級");
-        } else {
             oxygenBtn.setToolTipText(
-                "升級氧氣瓶 Lv."
-                + InventoryManager.getOxygenLevel()
-                + " → Lv."
-                + (InventoryManager.getOxygenLevel() + 1)
-                + "，需要 $"
-                + InventoryManager.getOxygenUpgradeCost()
+                "氧氣瓶已達最高等級｜目前氧氣時間 "
+                + String.format("%.0f", InventoryManager.getMaxOxygenTime())
+                + " 秒"
             );
+            return;
         }
 
+        int currentLevel = InventoryManager.getOxygenLevel();
+        double currentTime = InventoryManager.getMaxOxygenTime();
+        double nextTime = getNextOxygenTime();
+
+        oxygenBtn.setToolTipText(
+            "升級氧氣瓶 Lv."
+            + currentLevel
+            + " → Lv."
+            + (currentLevel + 1)
+            + "｜費用 $"
+            + InventoryManager.getOxygenUpgradeCost()
+            + "｜氧氣時間 "
+            + String.format("%.0f", currentTime)
+            + " 秒 → "
+            + String.format("%.0f", nextTime)
+            + " 秒"
+        );
+    }
+
+    private void updateBackpackTooltip() {
         if (InventoryManager.getBackpackUpgradeCost() == -1) {
-            backpackBtn.setToolTipText("背包已達最高等級");
-        } else {
             backpackBtn.setToolTipText(
-                "升級背包 Lv."
-                + InventoryManager.getBackpackLevel()
-                + " → Lv."
-                + (InventoryManager.getBackpackLevel() + 1)
-                + "，需要 $"
-                + InventoryManager.getBackpackUpgradeCost()
+                "背包已達最高等級｜目前容量 "
+                + InventoryManager.getBackpackCapacity()
+                + " 隻魚"
             );
+            return;
         }
+
+        int currentLevel = InventoryManager.getBackpackLevel();
+        int currentCapacity = InventoryManager.getBackpackCapacity();
+        int nextCapacity = getNextBackpackCapacity();
+
+        backpackBtn.setToolTipText(
+            "升級背包 Lv."
+            + currentLevel
+            + " → Lv."
+            + (currentLevel + 1)
+            + "｜費用 $"
+            + InventoryManager.getBackpackUpgradeCost()
+            + "｜容量 "
+            + currentCapacity
+            + " 隻魚 → "
+            + nextCapacity
+            + " 隻魚"
+        );
+    }
+
+    private int getNextSuitDepth() {
+        int nextLevel = InventoryManager.getSuitLevel() + 1;
+
+        if (nextLevel == 2) {
+            return 1500;
+        }
+
+        if (nextLevel == 3) {
+            return 2400;
+        }
+
+        return InventoryManager.getMaxDepth();
+    }
+
+    private double getNextOxygenTime() {
+        int nextLevel = InventoryManager.getOxygenLevel() + 1;
+
+        if (nextLevel == 2) {
+            return 90.0;
+        }
+
+        if (nextLevel == 3) {
+            return 120.0;
+        }
+
+        return InventoryManager.getMaxOxygenTime();
+    }
+
+    private int getNextBackpackCapacity() {
+        int nextLevel = InventoryManager.getBackpackLevel() + 1;
+
+        if (nextLevel == 2) {
+            return 8;
+        }
+
+        if (nextLevel == 3) {
+            return 12;
+        }
+
+        return InventoryManager.getBackpackCapacity();
     }
 
     @Override
     public void addNotify() {
         super.addNotify();
-        updateShopText("點選商店中的設備區域進行升級。");
+        updateShopText();
+        setBottomMessage("點選商店中的設備區域進行升級。");
     }
 
     @Override
@@ -257,6 +615,7 @@ public class GearShopScreen extends JPanel {
             g.fillRect(0, 0, getWidth(), getHeight());
         }
 
+        drawBoss(g);
         drawBottomMessageBox(g);
     }
 

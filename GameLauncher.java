@@ -1,12 +1,12 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
 import java.io.IOException;
 
 public class GameLauncher extends JFrame {
-
     private CardLayout cardLayout = new CardLayout();
     private JPanel mainPanel = new JPanel(cardLayout);
 
@@ -14,47 +14,26 @@ public class GameLauncher extends JFrame {
     private OceanWorld oceanPanel;
     private GearShopScreen gearShopPanel;
 
+    private JPanel titlePanel;
+
+    private boolean gameStarted = false;
+
     public static final int WIN_WIDTH = 1600;
     public static final int WIN_HEIGHT = 900;
 
     public GameLauncher() {
         setTitle("深海工域 - Deep Sea Industry");
         setSize(WIN_WIDTH, WIN_HEIGHT);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
 
-        oceanPanel = new OceanWorld(e -> {
-            cardLayout.show(mainPanel, "LandScreen");
-            SwingUtilities.invokeLater(() -> {
-                landPanel.resetPlayerPosition();
-                landPanel.requestFocusInWindow();
-            });
-        });
+        // 改成自己控制關閉，這樣才能在關掉前自動存檔
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
-        gearShopPanel = new GearShopScreen(e -> {
-            cardLayout.show(mainPanel, "LandScreen");
-            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
-        });
+        setupWindowCloseSave();
 
-        landPanel = new LandWorld(
-            e -> {
-                oceanPanel.resetPlayerPosition();
-                cardLayout.show(mainPanel, "OceanScreen");
-                SwingUtilities.invokeLater(() -> oceanPanel.requestFocusInWindow());
-            },
-            e -> {
-                cardLayout.show(mainPanel, "GearShopScreen");
-                SwingUtilities.invokeLater(() -> gearShopPanel.requestFocusInWindow());
-            }
-        );
-
-        JPanel titlePanel = createTitlePanel();
-
+        titlePanel = createTitlePanel();
         mainPanel.add(titlePanel, "TitleScreen");
-        mainPanel.add(landPanel, "LandScreen");
-        mainPanel.add(oceanPanel, "OceanScreen");
-        mainPanel.add(gearShopPanel, "GearShopScreen");
 
         add(mainPanel);
 
@@ -63,11 +42,116 @@ public class GameLauncher extends JFrame {
         setVisible(true);
     }
 
+    private void setupWindowCloseSave() {
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (gameStarted) {
+                    InventoryManager.saveGame();
+                }
+
+                dispose();
+                System.exit(0);
+            }
+        });
+    }
+
+    private void createGamePanels() {
+        oceanPanel = new OceanWorld(e -> {
+            cardLayout.show(mainPanel, "LandScreen");
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.resetPlayerPosition();
+                landPanel.requestFocusInWindow();
+            });
+        });
+
+        gearShopPanel = new GearShopScreen(e -> {
+            cardLayout.show(mainPanel, "LandScreen");
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.requestFocusInWindow();
+            });
+        });
+
+        landPanel = new LandWorld(
+            e -> {
+                oceanPanel.resetPlayerPosition();
+                cardLayout.show(mainPanel, "OceanScreen");
+
+                SwingUtilities.invokeLater(() -> {
+                    oceanPanel.requestFocusInWindow();
+                });
+            },
+            e -> {
+                cardLayout.show(mainPanel, "GearShopScreen");
+
+                SwingUtilities.invokeLater(() -> {
+                    gearShopPanel.requestFocusInWindow();
+                });
+            }
+        );
+
+        mainPanel.add(landPanel, "LandScreen");
+        mainPanel.add(oceanPanel, "OceanScreen");
+        mainPanel.add(gearShopPanel, "GearShopScreen");
+    }
+
+    private void startNewGame() {
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            "確定要開始新遊戲嗎？\n舊存檔會被覆蓋。",
+            "開始新遊戲",
+            JOptionPane.YES_NO_OPTION
+        );
+
+        if (result != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        InventoryManager.resetGame();
+        InventoryManager.saveGame();
+
+        gameStarted = true;
+
+        createGamePanels();
+        cardLayout.show(mainPanel, "LandScreen");
+
+        SwingUtilities.invokeLater(() -> {
+            landPanel.requestFocusInWindow();
+        });
+    }
+
+    private void continueGame() {
+        boolean success = InventoryManager.loadGame();
+
+        if (!success) {
+            JOptionPane.showMessageDialog(
+                this,
+                "找不到存檔，請先開始新遊戲。",
+                "沒有存檔",
+                JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        gameStarted = true;
+
+        createGamePanels();
+        cardLayout.show(mainPanel, "LandScreen");
+
+        SwingUtilities.invokeLater(() -> {
+            landPanel.requestFocusInWindow();
+        });
+    }
+
     private JPanel createTitlePanel() {
         return new JPanel(null) {
-
             private Image coverImg;
             private Cursor handCursor;
+
+            private JButton continueBtn;
+            private JButton newGameBtn;
 
             {
                 handCursor = loadCustomCursor();
@@ -80,28 +164,48 @@ public class GameLauncher extends JFrame {
                     e.printStackTrace();
                 }
 
-                JButton startBtn = new JButton("START MISSION");
+                setupButtons();
+            }
 
-                startBtn.setBounds(600, 600, 400, 100);
-                startBtn.setFont(new Font("Monospaced", Font.BOLD, 34));
-                startBtn.setBackground(new Color(20, 50, 70));
-                startBtn.setForeground(new Color(0, 255, 255));
-                startBtn.setFocusPainted(false);
-                startBtn.setBorder(
+            private void setupButtons() {
+                continueBtn = createMenuButton("CONTINUE GAME");
+                continueBtn.setBounds(600, 560, 400, 80);
+                continueBtn.setEnabled(InventoryManager.hasSaveFile());
+
+                continueBtn.addActionListener(e -> {
+                    continueGame();
+                });
+
+                add(continueBtn);
+
+                newGameBtn = createMenuButton("NEW GAME");
+                newGameBtn.setBounds(600, 660, 400, 80);
+
+                newGameBtn.addActionListener(e -> {
+                    startNewGame();
+                });
+
+                add(newGameBtn);
+            }
+
+            private JButton createMenuButton(String text) {
+                JButton btn = new JButton(text);
+
+                btn.setFont(new Font("Monospaced", Font.BOLD, 30));
+                btn.setBackground(new Color(20, 50, 70));
+                btn.setForeground(new Color(0, 255, 255));
+                btn.setFocusPainted(false);
+
+                btn.setBorder(
                     BorderFactory.createLineBorder(
                         new Color(0, 255, 255),
                         4
                     )
                 );
 
-                startBtn.setCursor(handCursor);
+                btn.setCursor(handCursor);
 
-                startBtn.addActionListener(e -> {
-                    cardLayout.show(mainPanel, "LandScreen");
-                    SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
-                });
-
-                add(startBtn);
+                return btn;
             }
 
             private Cursor loadCustomCursor() {
@@ -172,12 +276,79 @@ public class GameLauncher extends JFrame {
                     g.setColor(new Color(0, 30, 80));
                     g.fillRect(0, 0, getWidth(), getHeight());
                 }
+
+                drawButtonBackground(g, continueBtn);
+                drawButtonBackground(g, newGameBtn);
+
+                drawSaveStatus(g);
+            }
+
+            private void drawButtonBackground(Graphics g, JButton btn) {
+                if (btn == null) {
+                    return;
+                }
+
+                Graphics2D g2d = (Graphics2D) g;
+
+                g2d.setRenderingHint(
+                    RenderingHints.KEY_ANTIALIASING,
+                    RenderingHints.VALUE_ANTIALIAS_ON
+                );
+
+                Rectangle b = btn.getBounds();
+
+                if (btn.isEnabled()) {
+                    g2d.setColor(new Color(255, 255, 255, 140));
+                } else {
+                    g2d.setColor(new Color(120, 120, 120, 120));
+                }
+
+                g2d.fillRoundRect(
+                    b.x,
+                    b.y,
+                    b.width,
+                    b.height,
+                    14,
+                    14
+                );
+
+                if (btn.isEnabled()) {
+                    g2d.setColor(new Color(0, 255, 255, 200));
+                } else {
+                    g2d.setColor(new Color(150, 150, 150, 180));
+                }
+
+                g2d.setStroke(new BasicStroke(3));
+
+                g2d.drawRoundRect(
+                    b.x,
+                    b.y,
+                    b.width,
+                    b.height,
+                    14,
+                    14
+                );
+            }
+
+            private void drawSaveStatus(Graphics g) {
+                g.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+
+                if (InventoryManager.hasSaveFile()) {
+                    g.setColor(new Color(180, 255, 220));
+                    g.drawString("已偵測到存檔，可選擇 Continue Game", 610, 755);
+                } else {
+                    g.setColor(new Color(255, 220, 180));
+                    g.drawString("尚未偵測到存檔，請選擇 New Game", 625, 755);
+                }
             }
         };
     }
 
     public static void main(String[] args) {
         System.setProperty("sun.java2d.uiScale", "1.0");
-        SwingUtilities.invokeLater(() -> new GameLauncher());
+
+        SwingUtilities.invokeLater(() -> {
+            new GameLauncher();
+        });
     }
 }
