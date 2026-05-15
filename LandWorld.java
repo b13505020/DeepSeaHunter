@@ -24,6 +24,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
 
     private final double SPEED = 6.0;
 
+    // 左上 Mechanical Market / 裝備商店範圍
     private Rectangle[] shopZones = {
         new Rectangle(0, 230, 240, 270),
         new Rectangle(180, 240, 220, 260),
@@ -31,12 +32,13 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(250, 260, 150, 230)
     };
 
-    // 你圈的 Headquarters 範圍
+    // Headquarters / 任務大廳範圍
     private Rectangle[] headquartersZones = {
         new Rectangle(720, 150, 240, 390),
         new Rectangle(930, 360, 180, 140)
     };
 
+    // 右下 Dive Zone
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
 
     private ActionListener onDive;
