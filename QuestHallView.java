@@ -38,26 +38,23 @@ public class QuestHallView extends JFrame {
         private boolean down;
         private boolean playerFacingLeft = false;
 
-        private double npcX = 1050;
-        private double npcY = 520;
+        // NPC 位置
+        private double npcX = 930;
+        private double npcY = 555;
 
-        private final int NPC_WIDTH = 90;
-        private final int NPC_HEIGHT = 120;
-        private final double NPC_SPEED = 2.0;
+        private final int NPC_WIDTH = 100;
+        private final int NPC_HEIGHT = 135;
+        private final double NPC_SPEED = 1.2;
 
+        // NPC 不再到處亂走，只在任務櫃台附近自然巡邏
+        private double npcLeftLimit = 850;
+        private double npcRightLimit = 1080;
+        private boolean npcMovingRight = true;
+
+        // 動畫控制
+        private int npcAnimTick = 0;
         private int npcFrame = 0;
         private int npcFrameCounter = 0;
-        private int npcDirection = 0;
-
-        private int currentPatrolIndex = 0;
-
-        private Point[] patrolPoints = {
-            new Point(360, 560),
-            new Point(650, 650),
-            new Point(940, 520),
-            new Point(1250, 620),
-            new Point(850, 430)
-        };
 
         public QuestHallPanel() {
             setLayout(null);
@@ -96,11 +93,7 @@ public class QuestHallView extends JFrame {
             JButton closeBtn = new JButton("Back");
             closeBtn.setBounds(20, 20, 100, 35);
             closeBtn.setFocusable(false);
-
-            closeBtn.addActionListener(e -> {
-                dispose();
-            });
-
+            closeBtn.addActionListener(e -> dispose());
             add(closeBtn);
         }
 
@@ -155,90 +148,41 @@ public class QuestHallView extends JFrame {
         }
 
         private void updateNpcMovement() {
-            Point target = patrolPoints[currentPatrolIndex];
+            npcAnimTick++;
 
-            double dx = target.x - npcX;
-            double dy = target.y - npcY;
-            double distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance < 5) {
-                currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.length;
-                return;
-            }
-
-            dx /= distance;
-            dy /= distance;
-
-            npcX += dx * NPC_SPEED;
-            npcY += dy * NPC_SPEED;
-
-            if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 0) {
-                    npcDirection = 2;
-                } else {
-                    npcDirection = 1;
+            // 只做左右慢慢巡邏，比原本繞大圈自然很多
+            if (npcMovingRight) {
+                npcX += NPC_SPEED;
+                if (npcX >= npcRightLimit) {
+                    npcMovingRight = false;
                 }
             } else {
-                if (dy > 0) {
-                    npcDirection = 0;
-                } else {
-                    npcDirection = 3;
+                npcX -= NPC_SPEED;
+                if (npcX <= npcLeftLimit) {
+                    npcMovingRight = true;
                 }
             }
 
+            // 走路幀不要跑太快，避免看起來抽搐
             npcFrameCounter++;
-
-            if (npcFrameCounter % 10 == 0) {
+            if (npcFrameCounter % 12 == 0) {
                 npcFrame = (npcFrame + 1) % 4;
             }
         }
 
         private boolean isNearNpc() {
-            Rectangle playerRect = new Rectangle(
-                (int) playerX,
-                (int) playerY,
-                PLAYER_WIDTH,
-                PLAYER_HEIGHT
-            );
+            double playerCenterX = playerX + PLAYER_WIDTH / 2.0;
+            double playerCenterY = playerY + PLAYER_HEIGHT / 2.0;
 
-            Rectangle npcRect = new Rectangle(
-                (int) npcX,
-                (int) npcY,
-                NPC_WIDTH,
-                NPC_HEIGHT
-            );
+            double npcCenterX = npcX + NPC_WIDTH / 2.0;
+            double npcCenterY = npcY + NPC_HEIGHT / 2.0;
 
-            return playerRect.intersects(npcRect);
-        }
+            double dx = playerCenterX - npcCenterX;
+            double dy = playerCenterY - npcCenterY;
+            double distance = Math.sqrt(dx * dx + dy * dy);
 
-        private void showMissionDialog() {
-            String[] missions = {
-                "新手任務：捕捉 3 隻沙丁魚",
-                "探索任務：下潛到 500m",
-                "收集任務：帶回 1 隻小丑魚",
-                "危險任務：擊倒 1 隻綠鰻魚"
-            };
-
-            String selected = (String) JOptionPane.showInputDialog(
-                this,
-                "請選擇一個任務：",
-                "任務大廳",
-                JOptionPane.PLAIN_MESSAGE,
-                null,
-                missions,
-                missions[0]
-            );
-
-            if (selected != null) {
-                JOptionPane.showMessageDialog(
-                    this,
-                    "你已接取任務：\n" + selected,
-                    "任務已接受",
-                    JOptionPane.INFORMATION_MESSAGE
-                );
-            }
-
-            requestFocusInWindow();
+            // 判定範圍放大，避免玩家明明靠近卻按不到
+            return distance < 190;
         }
 
         @Override
@@ -265,34 +209,69 @@ public class QuestHallView extends JFrame {
         }
 
         private void drawNpc(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+
+            int drawX = (int) npcX;
+            int drawY = (int) npcY;
+
+            // 輕微上下浮動，像呼吸，不會像亂跳
+            int floatY = (int) (Math.sin(npcAnimTick * 0.08) * 3);
+
             if (npcSheet != null) {
-                int frameWidth = npcSheet.getWidth() / 4;
-                int frameHeight = npcSheet.getHeight() / 4;
+                int sheetW = npcSheet.getWidth();
+                int sheetH = npcSheet.getHeight();
+
+                // 假設 NPC 圖是 4 欄 x 4 列 sprite sheet
+                // 但只用第 0 列，避免上下左右列不一致造成走路怪
+                int frameWidth = sheetW / 4;
+                int frameHeight = sheetH / 4;
 
                 int srcX1 = npcFrame * frameWidth;
-                int srcY1 = npcDirection * frameHeight;
+                int srcY1 = 0;
                 int srcX2 = srcX1 + frameWidth;
                 int srcY2 = srcY1 + frameHeight;
 
-                g.drawImage(
-                    npcSheet,
-                    (int) npcX,
-                    (int) npcY,
-                    (int) npcX + NPC_WIDTH,
-                    (int) npcY + NPC_HEIGHT,
-                    srcX1,
-                    srcY1,
-                    srcX2,
-                    srcY2,
-                    this
-                );
+                if (npcMovingRight) {
+                    g2.drawImage(
+                        npcSheet,
+                        drawX,
+                        drawY + floatY,
+                        drawX + NPC_WIDTH,
+                        drawY + floatY + NPC_HEIGHT,
+                        srcX1,
+                        srcY1,
+                        srcX2,
+                        srcY2,
+                        this
+                    );
+                } else {
+                    // 往左走時直接水平翻轉，不用切到另一列，避免方向錯亂
+                    g2.drawImage(
+                        npcSheet,
+                        drawX + NPC_WIDTH,
+                        drawY + floatY,
+                        drawX,
+                        drawY + floatY + NPC_HEIGHT,
+                        srcX1,
+                        srcY1,
+                        srcX2,
+                        srcY2,
+                        this
+                    );
+                }
             } else {
-                g.setColor(new Color(180, 120, 60));
-                g.fillRoundRect((int) npcX, (int) npcY, NPC_WIDTH, NPC_HEIGHT, 20, 20);
+                g2.setColor(new Color(180, 120, 60));
+                g2.fillRoundRect(drawX, drawY + floatY, NPC_WIDTH, NPC_HEIGHT, 20, 20);
 
-                g.setColor(Color.WHITE);
-                g.drawString("Quest NPC", (int) npcX, (int) npcY - 10);
+                g2.setColor(Color.WHITE);
+                g2.drawString("Quest NPC", drawX, drawY - 10 + floatY);
             }
+
+            // NPC 腳下陰影，讓他比較站在地上
+            g2.setColor(new Color(0, 0, 0, 90));
+            g2.fillOval(drawX + 15, drawY + NPC_HEIGHT - 5, NPC_WIDTH - 30, 18);
+
+            g2.dispose();
         }
 
         private void drawPlayer(Graphics g) {
