@@ -31,14 +31,22 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(250, 260, 150, 230)
     };
 
+    // 你圈的 Headquarters 範圍
+    private Rectangle[] headquartersZones = {
+        new Rectangle(720, 150, 240, 390),
+        new Rectangle(930, 360, 180, 140)
+    };
+
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
 
     private ActionListener onDive;
     private ActionListener onEnterShop;
+    private ActionListener onEnterHeadquarters;
 
-    public LandWorld(ActionListener onDive, ActionListener onEnterShop) {
+    public LandWorld(ActionListener onDive, ActionListener onEnterShop, ActionListener onEnterHeadquarters) {
         this.onDive = onDive;
         this.onEnterShop = onEnterShop;
+        this.onEnterHeadquarters = onEnterHeadquarters;
 
         setLayout(null);
         setFocusable(true);
@@ -142,6 +150,15 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         return false;
     }
 
+    private boolean isInHeadquartersZone(Rectangle playerRect) {
+        for (Rectangle zone : headquartersZones) {
+            if (playerRect.intersects(zone)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -203,7 +220,9 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 22));
 
-        if (isInShopZone(pRect)) {
+        if (isInHeadquartersZone(pRect)) {
+            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
+        } else if (isInShopZone(pRect)) {
             g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
         } else if (pRect.intersects(diveZone)) {
             g.drawString("Press ENTER to Dive", (int) playerX - 30, (int) playerY - 20);
@@ -238,7 +257,9 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 PLAYER_HEIGHT
             );
 
-            if (isInShopZone(pRect)) {
+            if (isInHeadquartersZone(pRect)) {
+                onEnterHeadquarters.actionPerformed(null);
+            } else if (isInShopZone(pRect)) {
                 onEnterShop.actionPerformed(null);
             } else if (pRect.intersects(diveZone)) {
                 onDive.actionPerformed(null);

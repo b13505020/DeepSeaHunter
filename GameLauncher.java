@@ -31,6 +31,10 @@ public class GameLauncher extends JFrame {
             e -> {
                 new ShopView();
                 SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+            },
+            e -> {
+                new QuestHallView();
+                SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
             }
         );
 
@@ -62,10 +66,8 @@ public class GameLauncher extends JFrame {
 
                 try {
                     coverImg = ImageIO.read(new File("assets/cover.png"));
-                    System.out.println("cover.png loaded");
                 } catch (IOException e) {
                     System.out.println("Cannot load assets/cover.png");
-                    e.printStackTrace();
                 }
 
                 JButton startBtn = new JButton("START MISSION");
@@ -76,8 +78,6 @@ public class GameLauncher extends JFrame {
                 startBtn.setForeground(new Color(0, 255, 255));
                 startBtn.setFocusPainted(false);
                 startBtn.setBorder(BorderFactory.createLineBorder(new Color(0, 255, 255), 4));
-
-                // 封面按鈕的自訂箭頭游標
                 startBtn.setCursor(handCursor);
 
                 startBtn.addActionListener(e -> {
@@ -93,7 +93,6 @@ public class GameLauncher extends JFrame {
                     File cursorFile = new File("assets/cursor_hand.png");
 
                     if (!cursorFile.exists()) {
-                        System.out.println("Cannot find assets/cursor_hand.png. Use system hand cursor.");
                         return Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
                     }
 
@@ -124,8 +123,6 @@ public class GameLauncher extends JFrame {
                     );
 
                 } catch (Exception e) {
-                    System.out.println("Custom cursor failed. Use system hand cursor.");
-                    e.printStackTrace();
                     return Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
                 }
             }
