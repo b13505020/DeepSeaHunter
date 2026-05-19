@@ -25,9 +25,14 @@ public class GameLauncher extends JFrame {
 
     public GameLauncher() {
         setTitle("深海工域 - Deep Sea Industry");
-        setSize(WIN_WIDTH, WIN_HEIGHT);
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+        int frameWidth = Math.min(WIN_WIDTH, screenSize.width - 80);
+        int frameHeight = Math.min(WIN_HEIGHT, screenSize.height - 80);
+
+        setSize(frameWidth, frameHeight);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
         setupWindowCloseSave();
@@ -35,7 +40,15 @@ public class GameLauncher extends JFrame {
         titlePanel = createTitlePanel();
         mainPanel.add(titlePanel, "TitleScreen");
 
-        add(mainPanel);
+        mainPanel.setPreferredSize(new Dimension(WIN_WIDTH, WIN_HEIGHT));
+
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
+        scrollPane.getHorizontalScrollBar().setUnitIncrement(20);
+
+        add(scrollPane);
+
         cardLayout.show(mainPanel, "TitleScreen");
 
         setVisible(true);
@@ -298,7 +311,7 @@ public class GameLauncher extends JFrame {
     }
 
     public static void main(String[] args) {
-        System.setProperty("sun.java2d.uiScale", "1.0");
+        System.setProperty("sun.java2d.uiScale", "0.8");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
 }
