@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import javax.imageio.ImageIO;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayDeque;
 
 public class OceanWorld extends JPanel {
 
@@ -43,6 +46,10 @@ public class OceanWorld extends JPanel {
     private int currentWeaponIndex = 0;
     private Weapon currentWeapon;
 
+    private int lastMouseX = SCREEN_WIDTH / 2;
+    private int lastMouseY = SCREEN_HEIGHT / 2;
+    private Map<String, BufferedImage> weaponImageCache = new HashMap<>();
+
     private ArrayList<Bullet> bullets = new ArrayList<>();
     private ArrayList<OceanFish> fishList = new ArrayList<>();
 
@@ -69,6 +76,8 @@ public class OceanWorld extends JPanel {
     }
 
     public void resetPlayerPosition() {
+        reloadOwnedWeapons();
+
         this.playerX = SCREEN_WIDTH / 2.0 - (PLAYER_WIDTH / 2.0);
         this.playerY = 600;
 
@@ -101,18 +110,21 @@ public class OceanWorld extends JPanel {
     }
 
     private void setupWeapons() {
+        reloadOwnedWeapons();
+    }
+    
+    private void reloadOwnedWeapons() {
         weaponList.clear();
-
-        weaponList.add(new Weapon("初級魚槍", 1, 600));
-        weaponList.add(new Weapon("水下步槍", 2, 750));
-        weaponList.add(new Weapon("狙擊槍", 6, 1300));
-        weaponList.add(new Weapon("網槍", 1, 500));
-        weaponList.add(new Weapon("睡眠槍", 1, 650));
-        weaponList.add(new Weapon("麻醉槍", 1, 650));
-        weaponList.add(new Weapon("榴彈發射器", 8, 450));
-        weaponList.add(new Weapon("寒冰槍", 2, 700));
-
-        currentWeaponIndex = 0;
+        weaponList.addAll(WeaponManager.getOwnedWeapons());
+    
+        if (weaponList.isEmpty()) {
+            weaponList.add(new Weapon("初級魚槍", 1, 600));
+        }
+    
+        if (currentWeaponIndex < 0 || currentWeaponIndex >= weaponList.size()) {
+            currentWeaponIndex = 0;
+        }
+    
         currentWeapon = weaponList.get(currentWeaponIndex);
     }
 
@@ -155,6 +167,7 @@ public class OceanWorld extends JPanel {
                 } else if (code == KeyEvent.VK_DOWN || code == KeyEvent.VK_S) {
                     downPressed = true;
                 } else if (code == KeyEvent.VK_SPACE) {
+                    updateAimAngle(lastMouseX, lastMouseY);
                     fire();
                 } else if (code == KeyEvent.VK_Q) {
                     switchWeapon(-1);
@@ -184,8 +197,13 @@ public class OceanWorld extends JPanel {
             public void mouseMoved(MouseEvent e) {
                 updateAimAngle(e.getX(), e.getY());
             }
+        
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                updateAimAngle(e.getX(), e.getY());
+            }
         });
-
+       
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -208,18 +226,20 @@ public class OceanWorld extends JPanel {
     }
 
     private void switchWeapon(int direction) {
+        reloadOwnedWeapons();
+    
         if (weaponList.isEmpty()) {
             return;
         }
-
+    
         currentWeaponIndex += direction;
-
+    
         if (currentWeaponIndex < 0) {
             currentWeaponIndex = weaponList.size() - 1;
         } else if (currentWeaponIndex >= weaponList.size()) {
             currentWeaponIndex = 0;
         }
-
+    
         currentWeapon = weaponList.get(currentWeaponIndex);
     }
 
@@ -504,11 +524,88 @@ public class OceanWorld extends JPanel {
     }
 
     private void updateAimAngle(int mx, int my) {
+        lastMouseX = mx;
+        lastMouseY = my;
+    
+        double worldMX = mx + cameraX;
         double worldMY = my + cameraY;
-        double baseDX = isFacingLeft ? -100.0 : 100.0;
-        double dy = worldMY - (playerY + PLAYER_HEIGHT / 2.0);
+    
+        double playerCenterX = playerX + PLAYER_WIDTH / 2.0;
+        double playerCenterY = playerY + PLAYER_HEIGHT / 2.0;
+    
+        double dx = worldMX - playerCenterX;
+        double dy = worldMY - playerCenterY;
+    
+        aimAngle = Math.toDegrees(Math.atan2(dy, dx));
+    
+        if (dx < 0) {
+            isFacingLeft = true;
+        } else if (dx > 0) {
+            isFacingLeft = false;
+        }
+    }
 
-        aimAngle = Math.toDegrees(Math.atan2(dy, baseDX));
+    private void drawCurrentWeapon(Graphics2D g2d, int playerScreenX, int playerScreenY) {
+        if (currentWeapon == null) {
+            return;
+        }
+    
+        BufferedImage weaponImg = getWeaponImage(currentWeapon);
+    
+        if (weaponImg == null) {
+            return;
+        }
+    
+        int weaponW = 110;
+        int weaponH = 55;
+    
+        String weaponName = currentWeapon.getName();
+    
+        if (weaponName.equals("狙擊槍")) {
+            weaponW = 165;
+            weaponH = 55;
+        } else if (weaponName.equals("水下步槍")) {
+            weaponW = 145;
+            weaponH = 55;
+        } else if (weaponName.equals("榴彈發射器")) {
+            weaponW = 135;
+            weaponH = 65;
+        } else if (weaponName.equals("網槍")) {
+            weaponW = 130;
+            weaponH = 60;
+        } else if (weaponName.equals("寒冰槍")) {
+            weaponW = 130;
+            weaponH = 60;
+        } else if (weaponName.equals("初級魚槍")) {
+            weaponW = 95;
+            weaponH = 45;
+        }
+    
+        int centerX = playerScreenX + PLAYER_WIDTH / 2;
+        int centerY = playerScreenY + PLAYER_HEIGHT / 2 + 8;
+    
+        Graphics2D gWeapon = (Graphics2D) g2d.create();
+    
+        gWeapon.setRenderingHint(
+            RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+        );
+    
+        gWeapon.translate(centerX, centerY);
+        gWeapon.rotate(Math.toRadians(aimAngle));
+    
+        // 重點：不要再用負寬度翻轉。
+        // 圖片本來朝右，rotate(aimAngle) 就能自然轉到左邊、右邊、上方、下方。
+        gWeapon.drawImage(
+            weaponImg,
+            8,
+            -weaponH / 2,
+            weaponW,
+            weaponH,
+            this
+        );
+    
+        gWeapon.dispose();
     }
 
     @Override
@@ -620,17 +717,132 @@ public class OceanWorld extends JPanel {
             g2d.setColor(Color.ORANGE);
             g2d.fillRect(sx, sy, PLAYER_WIDTH, PLAYER_HEIGHT);
         }
-
-        g2d.setColor(Color.WHITE);
-        g2d.drawLine(
-            sx + PLAYER_WIDTH / 2,
-            sy + PLAYER_HEIGHT / 2,
-            sx + PLAYER_WIDTH / 2 + (int) (Math.cos(Math.toRadians(aimAngle)) * 50),
-            sy + PLAYER_HEIGHT / 2 + (int) (Math.sin(Math.toRadians(aimAngle)) * 50)
-        );
-
+        
+        // 新增：畫出目前手持的武器
+        drawCurrentWeapon(g2d, sx, sy);
+        
+        // 原本的白色瞄準線先註解掉，不然會蓋在武器上
+        // g2d.setColor(Color.WHITE);
+        // g2d.drawLine(
+        //     sx + PLAYER_WIDTH / 2,
+        //     sy + PLAYER_HEIGHT / 2,
+        //     sx + PLAYER_WIDTH / 2 + (int) (Math.cos(Math.toRadians(aimAngle)) * 50),
+        //     sy + PLAYER_HEIGHT / 2 + (int) (Math.sin(Math.toRadians(aimAngle)) * 50)
+        // );
+        
         drawUI(g2d);
     }
+    private BufferedImage getWeaponImage(Weapon weapon) {
+        String imagePath = WeaponManager.getImagePath(weapon);
+    
+        if (imagePath == null || imagePath.isEmpty()) {
+            return null;
+        }
+    
+        if (weaponImageCache.containsKey(imagePath)) {
+            return weaponImageCache.get(imagePath);
+        }
+    
+        try {
+            File weaponFile = new File(imagePath);
+    
+            if (!weaponFile.exists()) {
+                System.out.println("找不到武器圖片：" + weaponFile.getAbsolutePath());
+                return null;
+            }
+    
+            BufferedImage original = ImageIO.read(weaponFile);
+            BufferedImage transparent = makeEdgeBackgroundTransparent(original);
+    
+            weaponImageCache.put(imagePath, transparent);
+            return transparent;
+    
+        } catch (Exception e) {
+            System.out.println("武器圖片載入失敗：" + imagePath);
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    private BufferedImage makeEdgeBackgroundTransparent(BufferedImage src) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+    
+        BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+    
+        boolean[][] visited = new boolean[w][h];
+        ArrayDeque<int[]> queue = new ArrayDeque<>();
+    
+        for (int x = 0; x < w; x++) {
+            queue.add(new int[] { x, 0 });
+            queue.add(new int[] { x, h - 1 });
+        }
+    
+        for (int y = 0; y < h; y++) {
+            queue.add(new int[] { 0, y });
+            queue.add(new int[] { w - 1, y });
+        }
+    
+        int[] dx = { 1, -1, 0, 0 };
+        int[] dy = { 0, 0, 1, -1 };
+    
+        while (!queue.isEmpty()) {
+            int[] p = queue.removeFirst();
+            int x = p[0];
+            int y = p[1];
+    
+            if (x < 0 || x >= w || y < 0 || y >= h) {
+                continue;
+            }
+    
+            if (visited[x][y]) {
+                continue;
+            }
+    
+            visited[x][y] = true;
+    
+            int argb = result.getRGB(x, y);
+    
+            if (!isBackgroundLike(argb)) {
+                continue;
+            }
+    
+            // 只把從邊緣連進來的背景變透明，避免誤刪武器內部亮點
+            result.setRGB(x, y, argb & 0x00FFFFFF);
+    
+            for (int i = 0; i < 4; i++) {
+                queue.add(new int[] { x + dx[i], y + dy[i] });
+            }
+        }
+    
+        return result;
+    }
+    
+    private boolean isBackgroundLike(int argb) {
+        int a = (argb >> 24) & 0xff;
+        int r = (argb >> 16) & 0xff;
+        int g = (argb >> 8) & 0xff;
+        int b = argb & 0xff;
+    
+        if (a < 10) {
+            return true;
+        }
+    
+        // 白底
+        if (r > 235 && g > 235 && b > 235) {
+            return true;
+        }
+    
+        // 灰白棋盤格背景
+        if (Math.abs(r - g) < 8 && Math.abs(g - b) < 8 && r >= 170 && r <= 245) {
+            return true;
+        }
+    
+        return false;
+    }    
 
     private void drawUI(Graphics2D g2d) {
         g2d.setColor(new Color(0, 0, 0, 180));

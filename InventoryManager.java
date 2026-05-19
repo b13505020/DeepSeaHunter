@@ -4,7 +4,9 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class InventoryManager {
     // 永久儲藏箱：成功上岸後的魚會存在這裡
@@ -12,6 +14,12 @@ public class InventoryManager {
 
     // 本次潛水暫存背包：還沒成功上岸前，魚先存在這裡
     private static List<Fish> currentDiveList = new ArrayList<>();
+
+    // 沙灘素材：本次沙灘暫存背包
+    private static LinkedHashMap<String, Integer> currentMaterialMap = createEmptyMaterialMap();
+
+    // 沙灘素材：永久儲藏箱
+    private static LinkedHashMap<String, Integer> storageMaterialMap = createEmptyMaterialMap();
 
     // 玩家真正可以花的錢
     private static int money = 0;
@@ -26,6 +34,68 @@ public class InventoryManager {
     // 存檔位置
     private static final String SAVE_FOLDER = "saves";
     private static final String SAVE_FILE = SAVE_FOLDER + "/deepsea_save.dat";
+
+    // =========================
+    // 沙灘素材名稱 / 圖片
+    // =========================
+
+    private static LinkedHashMap<String, Integer> createEmptyMaterialMap() {
+        LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
+
+        map.put("潮蝕木材", 0);
+        map.put("巨螺殼", 0);
+        map.put("貝殼碎片", 0);
+        map.put("珊瑚碎枝", 0);
+        map.put("纜繩鉤環", 0);
+        map.put("鏽蝕齒輪", 0);
+        map.put("海蝕石", 0);
+
+        return map;
+    }
+
+    private static void ensureMaterialMaps() {
+        currentMaterialMap = normalizeMaterialMap(currentMaterialMap);
+        storageMaterialMap = normalizeMaterialMap(storageMaterialMap);
+    }
+
+    private static LinkedHashMap<String, Integer> normalizeMaterialMap(Map<String, Integer> oldMap) {
+        LinkedHashMap<String, Integer> result = createEmptyMaterialMap();
+
+        if (oldMap == null) {
+            return result;
+        }
+
+        for (String key : oldMap.keySet()) {
+            int value = oldMap.getOrDefault(key, 0);
+
+            if (result.containsKey(key)) {
+                result.put(key, Math.max(0, value));
+            }
+        }
+
+        return result;
+    }
+
+    public static String getMaterialImagePath(String name) {
+        switch (name) {
+            case "潮蝕木材":
+                return "assets/tideworn_wood.png";
+            case "巨螺殼":
+                return "assets/giant_conch.png";
+            case "貝殼碎片":
+                return "assets/shell_fragments.png";
+            case "珊瑚碎枝":
+                return "assets/coral_branch.png";
+            case "纜繩鉤環":
+                return "assets/hooked_rope.png";
+            case "鏽蝕齒輪":
+                return "assets/rusted_gear.png";
+            case "海蝕石":
+                return "assets/sea_worn_stone.png";
+            default:
+                return "";
+        }
+    }
 
     // =========================
     // 金錢相關
@@ -94,7 +164,7 @@ public class InventoryManager {
     }
 
     // =========================
-    // 背包 / 儲藏箱相關
+    // 魚背包 / 儲藏箱相關
     // =========================
 
     public static List<Fish> getMyBackpack() {
@@ -139,6 +209,101 @@ public class InventoryManager {
         }
 
         return total;
+    }
+
+    // =========================
+    // 沙灘素材背包 / 儲藏箱相關
+    // =========================
+
+    public static void addCurrentMaterial(String name, int amount) {
+        ensureMaterialMaps();
+
+        if (!currentMaterialMap.containsKey(name)) {
+            return;
+        }
+
+        int oldCount = currentMaterialMap.get(name);
+        currentMaterialMap.put(name, oldCount + Math.max(0, amount));
+    }
+
+    public static void moveCurrentMaterialsToStorage() {
+        ensureMaterialMaps();
+
+        for (String name : currentMaterialMap.keySet()) {
+            int currentCount = currentMaterialMap.getOrDefault(name, 0);
+
+            if (currentCount > 0) {
+                int oldStorageCount = storageMaterialMap.getOrDefault(name, 0);
+                storageMaterialMap.put(name, oldStorageCount + currentCount);
+            }
+        }
+
+        currentMaterialMap = createEmptyMaterialMap();
+    }
+
+    public static void clearCurrentMaterials() {
+        currentMaterialMap = createEmptyMaterialMap();
+    }
+
+    public static Map<String, Integer> getCurrentMaterials() {
+        ensureMaterialMaps();
+        return new LinkedHashMap<>(currentMaterialMap);
+    }
+
+    public static Map<String, Integer> getStorageMaterials() {
+        ensureMaterialMaps();
+        return new LinkedHashMap<>(storageMaterialMap);
+    }
+
+    public static int getCurrentMaterialTotalCount() {
+        ensureMaterialMaps();
+
+        int total = 0;
+
+        for (int count : currentMaterialMap.values()) {
+            total += count;
+        }
+
+        return total;
+    }
+
+    public static int getStorageMaterialTotalCount() {
+        ensureMaterialMaps();
+
+        int total = 0;
+
+        for (int count : storageMaterialMap.values()) {
+            total += count;
+        }
+
+        return total;
+    }
+
+    public static int getStorageMaterialCount(String name) {
+        ensureMaterialMaps();
+        return storageMaterialMap.getOrDefault(name, 0);
+    }
+
+    public static boolean hasStorageMaterial(String name, int amount) {
+        ensureMaterialMaps();
+        return storageMaterialMap.getOrDefault(name, 0) >= amount;
+    }
+
+    public static boolean spendStorageMaterial(String name, int amount) {
+        ensureMaterialMaps();
+
+        if (!storageMaterialMap.containsKey(name)) {
+            return false;
+        }
+
+        int currentCount = storageMaterialMap.get(name);
+
+        if (currentCount < amount) {
+            return false;
+        }
+
+        storageMaterialMap.put(name, currentCount - amount);
+        return true;
     }
 
     // =========================
@@ -297,6 +462,8 @@ public class InventoryManager {
 
     public static boolean saveGame() {
         try {
+            ensureMaterialMaps();
+
             File folder = new File(SAVE_FOLDER);
 
             if (!folder.exists()) {
@@ -313,7 +480,11 @@ public class InventoryManager {
             data.storageList = new ArrayList<>(storageList);
             data.currentDiveList = new ArrayList<>(currentDiveList);
 
+            data.currentMaterials = new LinkedHashMap<>(currentMaterialMap);
+            data.storageMaterials = new LinkedHashMap<>(storageMaterialMap);
+
             data.unlockedFish = CollectionManager.getUnlockedFishSnapshot();
+            data.ownedWeapons = WeaponManager.getOwnedWeaponNamesSnapshot();
 
             ObjectOutputStream out = new ObjectOutputStream(
                 new FileOutputStream(SAVE_FILE)
@@ -363,7 +534,11 @@ public class InventoryManager {
                 currentDiveList = new ArrayList<>();
             }
 
+            currentMaterialMap = normalizeMaterialMap(data.currentMaterials);
+            storageMaterialMap = normalizeMaterialMap(data.storageMaterials);
+
             CollectionManager.setUnlockedFish(data.unlockedFish);
+            WeaponManager.setOwnedWeaponNames(data.ownedWeapons);
 
             System.out.println("✅ 讀取存檔成功：" + SAVE_FILE);
             return true;
@@ -379,6 +554,9 @@ public class InventoryManager {
         storageList.clear();
         currentDiveList.clear();
 
+        currentMaterialMap = createEmptyMaterialMap();
+        storageMaterialMap = createEmptyMaterialMap();
+
         money = 0;
 
         oxygenLevel = 1;
@@ -386,6 +564,7 @@ public class InventoryManager {
         backpackLevel = 1;
 
         CollectionManager.resetUnlockedFish();
+        WeaponManager.resetOwnedWeapons();
 
         System.out.println("已建立新遊戲資料");
     }

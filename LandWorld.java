@@ -38,17 +38,33 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(930, 360, 180, 140)
     };
 
+    // Blacksmith / 武器商店範圍
+    private Rectangle blacksmithZone = new Rectangle(390, 220, 230, 330);
+
     // 右下 Dive Zone
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
+
+    // 下方正中間 Coast Zone / 沙灘入口
+    private Rectangle coastZone = new Rectangle(690, 720, 260, 170);
 
     private ActionListener onDive;
     private ActionListener onEnterShop;
     private ActionListener onEnterHeadquarters;
+    private ActionListener onEnterBeach;
+    private ActionListener onEnterBlacksmith;
 
-    public LandWorld(ActionListener onDive, ActionListener onEnterShop, ActionListener onEnterHeadquarters) {
+    public LandWorld(
+        ActionListener onDive,
+        ActionListener onEnterShop,
+        ActionListener onEnterHeadquarters,
+        ActionListener onEnterBeach,
+        ActionListener onEnterBlacksmith
+    ) {
         this.onDive = onDive;
         this.onEnterShop = onEnterShop;
         this.onEnterHeadquarters = onEnterHeadquarters;
+        this.onEnterBeach = onEnterBeach;
+        this.onEnterBlacksmith = onEnterBlacksmith;
 
         setLayout(null);
         setFocusable(true);
@@ -149,6 +165,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -158,7 +175,16 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 return true;
             }
         }
+
         return false;
+    }
+
+    private boolean isInCoastZone(Rectangle playerRect) {
+        return playerRect.intersects(coastZone);
+    }
+    
+    private boolean isInBlacksmithZone(Rectangle playerRect) {
+        return playerRect.intersects(blacksmithZone);
     }
 
     @Override
@@ -218,16 +244,20 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
             PLAYER_WIDTH,
             PLAYER_HEIGHT
         );
-
+    
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 22));
-
-        if (isInHeadquartersZone(pRect)) {
-            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
+    
+        if (isInBlacksmithZone(pRect)) {
+            g.drawString("Press ENTER to Blacksmith", (int) playerX - 70, (int) playerY - 20);
         } else if (isInShopZone(pRect)) {
             g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
+        } else if (isInHeadquartersZone(pRect)) {
+            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
         } else if (pRect.intersects(diveZone)) {
             g.drawString("Press ENTER to Dive", (int) playerX - 30, (int) playerY - 20);
+        } else if (isInCoastZone(pRect)) {
+            g.drawString("Press ENTER to Coast", (int) playerX - 30, (int) playerY - 20);
         }
     }
 
@@ -259,12 +289,16 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 PLAYER_HEIGHT
             );
 
-            if (isInHeadquartersZone(pRect)) {
-                onEnterHeadquarters.actionPerformed(null);
+            if (isInBlacksmithZone(pRect)) {
+                onEnterBlacksmith.actionPerformed(null);
             } else if (isInShopZone(pRect)) {
                 onEnterShop.actionPerformed(null);
+            } else if (isInHeadquartersZone(pRect)) {
+                onEnterHeadquarters.actionPerformed(null);     
             } else if (pRect.intersects(diveZone)) {
                 onDive.actionPerformed(null);
+            } else if (isInCoastZone(pRect)) {
+                onEnterBeach.actionPerformed(null);
             }
         }
     }
