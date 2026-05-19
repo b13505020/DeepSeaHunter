@@ -18,6 +18,9 @@ public class GameLauncher extends JFrame {
     private JPanel titlePanel;
     private boolean gameStarted = false;
 
+    // 右上角任務 HUD，會蓋在主視窗所有 CardLayout 畫面上
+    private MissionHudOverlay missionHud;
+
     public static final int WIN_WIDTH = 1600;
     public static final int WIN_HEIGHT = 900;
 
@@ -34,6 +37,13 @@ public class GameLauncher extends JFrame {
         mainPanel.add(titlePanel, "TitleScreen");
 
         add(mainPanel);
+
+        // 加上全域任務 HUD
+        // 這層會顯示在 LandWorld、OceanWorld、GearShopScreen 上方
+        missionHud = new MissionHudOverlay();
+        setGlassPane(missionHud);
+        missionHud.setVisible(true);
+
         cardLayout.show(mainPanel, "TitleScreen");
 
         setVisible(true);
@@ -58,26 +68,43 @@ public class GameLauncher extends JFrame {
 
         oceanPanel = new OceanWorld(e -> {
             cardLayout.show(mainPanel, "LandScreen");
-            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.resetPlayerPosition();
+                landPanel.requestFocusInWindow();
+            });
         });
 
         gearShopPanel = new GearShopScreen(e -> {
             cardLayout.show(mainPanel, "LandScreen");
-            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.requestFocusInWindow();
+            });
         });
 
         landPanel = new LandWorld(
             e -> {
+                oceanPanel.resetPlayerPosition();
                 cardLayout.show(mainPanel, "OceanScreen");
-                SwingUtilities.invokeLater(() -> oceanPanel.requestFocusInWindow());
+
+                SwingUtilities.invokeLater(() -> {
+                    oceanPanel.requestFocusInWindow();
+                });
             },
             e -> {
                 cardLayout.show(mainPanel, "GearShopScreen");
-                SwingUtilities.invokeLater(() -> gearShopPanel.requestFocusInWindow());
+
+                SwingUtilities.invokeLater(() -> {
+                    gearShopPanel.requestFocusInWindow();
+                });
             },
             e -> {
                 new QuestHallView();
-                SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+
+                SwingUtilities.invokeLater(() -> {
+                    landPanel.requestFocusInWindow();
+                });
             }
         );
 
@@ -104,12 +131,15 @@ public class GameLauncher extends JFrame {
 
         InventoryManager.resetGame();
         InventoryManager.saveGame();
+
         gameStarted = true;
 
         createGamePanels();
         cardLayout.show(mainPanel, "LandScreen");
 
-        SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+        SwingUtilities.invokeLater(() -> {
+            landPanel.requestFocusInWindow();
+        });
     }
 
     private void continueGame() {
@@ -130,7 +160,9 @@ public class GameLauncher extends JFrame {
         createGamePanels();
         cardLayout.show(mainPanel, "LandScreen");
 
-        SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+        SwingUtilities.invokeLater(() -> {
+            landPanel.requestFocusInWindow();
+        });
     }
 
     private JPanel createTitlePanel() {
