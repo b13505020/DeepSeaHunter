@@ -23,13 +23,21 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private boolean facingLeft = false;
 
     private final double SPEED = 6.0;
+    private final int WORLD_WIDTH = 1600;
+    private final int WORLD_HEIGHT = 900;
 
-    // 左上 Mechanical Market / 裝備商店範圍
+    // 左上 Mechanical Market / 裝備升級商店範圍
     private Rectangle[] shopZones = {
         new Rectangle(0, 230, 240, 270),
         new Rectangle(180, 240, 220, 260),
         new Rectangle(70, 180, 260, 90),
         new Rectangle(250, 260, 150, 230)
+    };
+
+    // 中間 Blacksmith / 武器商店範圍
+    private Rectangle[] weaponShopZones = {
+        new Rectangle(390, 205, 210, 285),
+        new Rectangle(325, 300, 210, 210)
     };
 
     // Headquarters / 任務大廳範圍
@@ -38,33 +46,36 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(930, 360, 180, 140)
     };
 
-    // Blacksmith / 武器商店範圍
-    private Rectangle blacksmithZone = new Rectangle(390, 220, 230, 330);
+    // 左下 Aquarium / 水族館範圍
+    private Rectangle aquariumZone = new Rectangle(45, 505, 355, 265);
 
-    // 右下 Dive Zone
-    private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
+    // 右下 Dive Zone / 下潛區
+    private Rectangle diveZone = new Rectangle(1080, 585, 295, 275);
 
-    // 下方正中間 Coast Zone / 沙灘入口
-    private Rectangle coastZone = new Rectangle(690, 720, 260, 170);
+    // 右側 Coast / 沙灘入口範圍
+    private Rectangle beachZone = new Rectangle(1320, 500, 260, 360);
 
     private ActionListener onDive;
     private ActionListener onEnterShop;
     private ActionListener onEnterHeadquarters;
     private ActionListener onEnterBeach;
-    private ActionListener onEnterBlacksmith;
+    private ActionListener onEnterWeaponShop;
+    private ActionListener onEnterAquarium;
 
     public LandWorld(
         ActionListener onDive,
         ActionListener onEnterShop,
         ActionListener onEnterHeadquarters,
         ActionListener onEnterBeach,
-        ActionListener onEnterBlacksmith
+        ActionListener onEnterWeaponShop,
+        ActionListener onEnterAquarium
     ) {
         this.onDive = onDive;
         this.onEnterShop = onEnterShop;
         this.onEnterHeadquarters = onEnterHeadquarters;
         this.onEnterBeach = onEnterBeach;
-        this.onEnterBlacksmith = onEnterBlacksmith;
+        this.onEnterWeaponShop = onEnterWeaponShop;
+        this.onEnterAquarium = onEnterAquarium;
 
         setLayout(null);
         setFocusable(true);
@@ -73,7 +84,9 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         loadImages();
         setupUIButtons();
 
-        new Thread(this).start();
+        Thread gameThread = new Thread(this);
+        gameThread.setDaemon(true);
+        gameThread.start();
     }
 
     private void loadImages() {
@@ -155,36 +168,38 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
             playerY += dy * SPEED;
         }
 
-        playerX = Math.max(0, Math.min(playerX, 1600 - PLAYER_WIDTH));
-        playerY = Math.max(0, Math.min(playerY, 900 - PLAYER_HEIGHT));
+        playerX = Math.max(0, Math.min(playerX, WORLD_WIDTH - PLAYER_WIDTH));
+        playerY = Math.max(0, Math.min(playerY, WORLD_HEIGHT - PLAYER_HEIGHT));
+    }
+
+    private Rectangle getPlayerRect() {
+        return new Rectangle(
+            (int) playerX,
+            (int) playerY,
+            PLAYER_WIDTH,
+            PLAYER_HEIGHT
+        );
+    }
+
+    private boolean isInAnyZone(Rectangle playerRect, Rectangle[] zones) {
+        for (Rectangle zone : zones) {
+            if (playerRect.intersects(zone)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isInShopZone(Rectangle playerRect) {
-        for (Rectangle zone : shopZones) {
-            if (playerRect.intersects(zone)) {
-                return true;
-            }
-        }
+        return isInAnyZone(playerRect, shopZones);
+    }
 
-        return false;
+    private boolean isInWeaponShopZone(Rectangle playerRect) {
+        return isInAnyZone(playerRect, weaponShopZones);
     }
 
     private boolean isInHeadquartersZone(Rectangle playerRect) {
-        for (Rectangle zone : headquartersZones) {
-            if (playerRect.intersects(zone)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private boolean isInCoastZone(Rectangle playerRect) {
-        return playerRect.intersects(coastZone);
-    }
-    
-    private boolean isInBlacksmithZone(Rectangle playerRect) {
-        return playerRect.intersects(blacksmithZone);
+        return isInAnyZone(playerRect, headquartersZones);
     }
 
     @Override
@@ -192,7 +207,10 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         super.paintComponent(g);
 
         if (background != null) {
-            g.drawImage(background, 0, 0, 1600, 900, this);
+            g.drawImage(background, 0, 0, WORLD_WIDTH, WORLD_HEIGHT, this);
+        } else {
+            g.setColor(new Color(35, 35, 45));
+            g.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
         }
 
         drawPlayer(g);
@@ -238,27 +256,47 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     }
 
     private void drawInteractionPrompt(Graphics g) {
-        Rectangle pRect = new Rectangle(
-            (int) playerX,
-            (int) playerY,
-            PLAYER_WIDTH,
-            PLAYER_HEIGHT
-        );
-    
-        g.setColor(Color.WHITE);
-        g.setFont(new Font("Monospaced", Font.BOLD, 22));
-    
-        if (isInBlacksmithZone(pRect)) {
-            g.drawString("Press ENTER to Blacksmith", (int) playerX - 70, (int) playerY - 20);
+        Rectangle pRect = getPlayerRect();
+
+        String prompt = null;
+
+        if (isInHeadquartersZone(pRect)) {
+            prompt = "Press ENTER to Headquarters";
+        } else if (isInAquariumZone(pRect)) {
+            prompt = "Press ENTER to Aquarium";
+        } else if (isInWeaponShopZone(pRect)) {
+            prompt = "Press ENTER to Blacksmith";
         } else if (isInShopZone(pRect)) {
-            g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
-        } else if (isInHeadquartersZone(pRect)) {
-            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
+            prompt = "Press ENTER to Shop";
         } else if (pRect.intersects(diveZone)) {
-            g.drawString("Press ENTER to Dive", (int) playerX - 30, (int) playerY - 20);
-        } else if (isInCoastZone(pRect)) {
-            g.drawString("Press ENTER to Coast", (int) playerX - 30, (int) playerY - 20);
+            prompt = "Press ENTER to Dive";
+        } else if (pRect.intersects(beachZone)) {
+            prompt = "Press ENTER to Beach";
         }
+
+        if (prompt == null) {
+            return;
+        }
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setFont(new Font("Monospaced", Font.BOLD, 22));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int textW = fm.stringWidth(prompt);
+        int textX = (int) playerX + PLAYER_WIDTH / 2 - textW / 2;
+        int textY = (int) playerY - 20;
+
+        g2.setColor(new Color(0, 0, 0, 160));
+        g2.fillRoundRect(textX - 12, textY - 26, textW + 24, 34, 12, 12);
+
+        g2.setColor(Color.WHITE);
+        g2.drawString(prompt, textX, textY);
+
+        g2.dispose();
+    }
+
+    private boolean isInAquariumZone(Rectangle playerRect) {
+        return playerRect.intersects(aquariumZone);
     }
 
     @Override
@@ -282,24 +320,25 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         }
 
         if (code == KeyEvent.VK_ENTER) {
-            Rectangle pRect = new Rectangle(
-                (int) playerX,
-                (int) playerY,
-                PLAYER_WIDTH,
-                PLAYER_HEIGHT
-            );
+            handleEnterAction();
+        }
+    }
 
-            if (isInBlacksmithZone(pRect)) {
-                onEnterBlacksmith.actionPerformed(null);
-            } else if (isInShopZone(pRect)) {
-                onEnterShop.actionPerformed(null);
-            } else if (isInHeadquartersZone(pRect)) {
-                onEnterHeadquarters.actionPerformed(null);     
-            } else if (pRect.intersects(diveZone)) {
-                onDive.actionPerformed(null);
-            } else if (isInCoastZone(pRect)) {
-                onEnterBeach.actionPerformed(null);
-            }
+    private void handleEnterAction() {
+        Rectangle pRect = getPlayerRect();
+
+        if (isInHeadquartersZone(pRect)) {
+            onEnterHeadquarters.actionPerformed(null);
+        } else if (isInAquariumZone(pRect)) {
+            onEnterAquarium.actionPerformed(null);
+        } else if (isInWeaponShopZone(pRect)) {
+            onEnterWeaponShop.actionPerformed(null);
+        } else if (isInShopZone(pRect)) {
+            onEnterShop.actionPerformed(null);
+        } else if (pRect.intersects(diveZone)) {
+            onDive.actionPerformed(null);
+        } else if (pRect.intersects(beachZone)) {
+            onEnterBeach.actionPerformed(null);
         }
     }
 

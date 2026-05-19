@@ -10,11 +10,14 @@ public class MissionHudOverlay extends JComponent {
     public MissionHudOverlay() {
         setOpaque(false);
 
-        repaintTimer = new Timer(300, e -> repaint());
+        repaintTimer = new Timer(300, e -> {
+            AquariumManager.updatePassiveIncomeSystem();
+            repaint();
+        });
         repaintTimer.start();
     }
 
-    // 很重要：讓這層 HUD 不會擋住滑鼠點擊下面的按鈕
+    // 讓 HUD 不會擋住下面的按鈕和滑鼠操作
     @Override
     public boolean contains(int x, int y) {
         return false;
@@ -29,6 +32,7 @@ public class MissionHudOverlay extends JComponent {
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
         drawMissionHud(g2);
+        drawAquariumIncomeHud(g2);
 
         g2.dispose();
     }
@@ -88,12 +92,31 @@ public class MissionHudOverlay extends JComponent {
 
             y += 24;
         }
+    }
 
-        if (missions.size() > 4) {
-            g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 13));
-            g2.setColor(new Color(180, 210, 220));
-            g2.drawString("僅顯示最近 4 個任務", panelX + 22, panelY + panelH - 14);
-        }
+    private void drawAquariumIncomeHud(Graphics2D g2) {
+        int panelX = 1125;
+        int panelY = 205;
+        int panelW = 430;
+        int panelH = 92;
+
+        drawPanel(g2, panelX, panelY, panelW, panelH);
+
+        int income = AquariumManager.calculatePassiveIncomePerMinute();
+        int lastIncome = AquariumManager.getLastPassiveIncome();
+        int nextSeconds = AquariumManager.getSecondsToNextPassiveIncome();
+
+        g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 19));
+        g2.setColor(new Color(255, 220, 130));
+        g2.drawString("水族館被動收入", panelX + 22, panelY + 32);
+
+        g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        g2.setColor(new Color(105, 230, 255));
+        g2.drawString("目前：$" + income + " / 分鐘", panelX + 22, panelY + 60);
+
+        g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+        g2.setColor(new Color(220, 235, 235));
+        g2.drawString("上次 +$" + lastIncome + "｜下次 " + nextSeconds + " 秒", panelX + 210, panelY + 60);
     }
 
     private void drawPanel(Graphics2D g2, int x, int y, int w, int h) {

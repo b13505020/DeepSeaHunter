@@ -20,7 +20,6 @@ public class GameLauncher extends JFrame {
     private JPanel titlePanel;
     private boolean gameStarted = false;
 
-    // 右上角任務 HUD，會蓋在主視窗所有 CardLayout 畫面上
     private MissionHudOverlay missionHud;
 
     public static final int WIN_WIDTH = 1600;
@@ -51,8 +50,7 @@ public class GameLauncher extends JFrame {
 
         add(scrollPane);
 
-        // 加上全域任務 HUD
-        // 封面先不顯示，進入遊戲後才顯示
+        // 全域任務 HUD：封面不顯示，進入遊戲後才顯示
         missionHud = new MissionHudOverlay();
         setGlassPane(missionHud);
         missionHud.setVisible(false);
@@ -148,6 +146,13 @@ public class GameLauncher extends JFrame {
 
                 SwingUtilities.invokeLater(() -> {
                     weaponShopPanel.requestFocusInWindow();
+                });
+            },
+            e -> {
+                new AquariumView();
+
+                SwingUtilities.invokeLater(() -> {
+                    landPanel.requestFocusInWindow();
                 });
             }
         );
