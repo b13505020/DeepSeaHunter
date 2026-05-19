@@ -244,20 +244,20 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
             PLAYER_WIDTH,
             PLAYER_HEIGHT
         );
-
+    
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 22));
-
+    
         if (isInBlacksmithZone(pRect)) {
             g.drawString("Press ENTER to Blacksmith", (int) playerX - 70, (int) playerY - 20);
-        } else if (isInHeadquartersZone(pRect)) {
-            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
         } else if (isInShopZone(pRect)) {
             g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
+        } else if (isInHeadquartersZone(pRect)) {
+            g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
         } else if (pRect.intersects(diveZone)) {
             g.drawString("Press ENTER to Dive", (int) playerX - 30, (int) playerY - 20);
         } else if (isInCoastZone(pRect)) {
-            g.drawString("Press ENTER to Coast Zone", (int) playerX - 60, (int) playerY - 20);
+            g.drawString("Press ENTER to Coast", (int) playerX - 30, (int) playerY - 20);
         }
     }
 
@@ -291,12 +291,10 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
 
             if (isInBlacksmithZone(pRect)) {
                 onEnterBlacksmith.actionPerformed(null);
-            } else if (isInHeadquartersZone(pRect)) {
-                onEnterHeadquarters.actionPerformed(null);
-            } else if (isInShopZone(pRect)) {
-                onEnterHeadquarters.actionPerformed(null);
             } else if (isInShopZone(pRect)) {
                 onEnterShop.actionPerformed(null);
+            } else if (isInHeadquartersZone(pRect)) {
+                onEnterHeadquarters.actionPerformed(null);     
             } else if (pRect.intersects(diveZone)) {
                 onDive.actionPerformed(null);
             } else if (isInCoastZone(pRect)) {
