@@ -3,13 +3,32 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.util.ArrayDeque;
 
 public class WeaponShopScreen extends JPanel {
 
     private Image bg;
-    private Image bossImage;
+    private BufferedImage bossImage;
 
     private ActionListener backAction;
+    private int bossX = 120;
+    private int bossY = 220;
+    private int bossW = 480;
+    private int bossH = 580;
+
+    private int bossDirection = 1;
+    private int bossLeftLimit = 90;
+    private int bossRightLimit = 210;
+
+    private String[] bossLines = {
+    "鐵匠：想換更猛的傢伙？錢夠就自己挑。",
+    "鐵匠：水下可不是開玩笑的地方，武器要選對。",
+    "鐵匠：狙擊槍打得遠，榴彈發射器火力猛。",
+    "鐵匠：沒錢就先去賣魚，別只會看。"
+};
+
+    private int currentBossLine = 0;
 
     private JLabel moneyLabel;
     private JPanel weaponListPanel;
@@ -23,6 +42,7 @@ public class WeaponShopScreen extends JPanel {
 
         loadImages();
         setupUI();
+        setupBossMovement();
 
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -31,6 +51,31 @@ public class WeaponShopScreen extends JPanel {
                 requestFocusInWindow();
             }
         });
+    }
+    private void setupBossMovement() {
+        Timer bossTimer = new Timer(80, e -> {
+            bossX += bossDirection;
+    
+            if (bossX <= bossLeftLimit || bossX >= bossRightLimit) {
+                bossDirection *= -1;
+            }
+    
+            repaint();
+        });
+    
+        bossTimer.start();
+    
+        Timer dialogueTimer = new Timer(3500, e -> {
+            currentBossLine++;
+    
+            if (currentBossLine >= bossLines.length) {
+                currentBossLine = 0;
+            }
+    
+            repaint();
+        });
+    
+        dialogueTimer.start();
     }
 
     private void loadImages() {
@@ -41,7 +86,8 @@ public class WeaponShopScreen extends JPanel {
         }
 
         try {
-            bossImage = ImageIO.read(new File("assets/shop_boss.png"));
+            BufferedImage originalBoss = ImageIO.read(new File("assets/shop_boss.png"));
+            bossImage = makeEdgeBackgroundTransparent(originalBoss);
         } catch (Exception e) {
             System.out.println("❌ 找不到 assets/shop_boss.png，武器商店不顯示老闆");
         }
@@ -72,6 +118,84 @@ public class WeaponShopScreen extends JPanel {
         refreshWeaponList();
     }
 
+    private BufferedImage makeEdgeBackgroundTransparent(BufferedImage src) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+    
+        BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+    
+        boolean[][] visited = new boolean[w][h];
+        ArrayDeque<int[]> queue = new ArrayDeque<>();
+    
+        for (int x = 0; x < w; x++) {
+            queue.add(new int[] { x, 0 });
+            queue.add(new int[] { x, h - 1 });
+        }
+    
+        for (int y = 0; y < h; y++) {
+            queue.add(new int[] { 0, y });
+            queue.add(new int[] { w - 1, y });
+        }
+    
+        int[] dx = { 1, -1, 0, 0 };
+        int[] dy = { 0, 0, 1, -1 };
+    
+        while (!queue.isEmpty()) {
+            int[] p = queue.removeFirst();
+            int x = p[0];
+            int y = p[1];
+    
+            if (x < 0 || x >= w || y < 0 || y >= h) {
+                continue;
+            }
+    
+            if (visited[x][y]) {
+                continue;
+            }
+    
+            visited[x][y] = true;
+    
+            int argb = result.getRGB(x, y);
+    
+            if (!isBackgroundLike(argb)) {
+                continue;
+            }
+    
+            result.setRGB(x, y, argb & 0x00FFFFFF);
+    
+            for (int i = 0; i < 4; i++) {
+                queue.add(new int[] { x + dx[i], y + dy[i] });
+            }
+        }
+    
+        return result;
+    }
+    
+    private boolean isBackgroundLike(int argb) {
+        int a = (argb >> 24) & 0xff;
+        int r = (argb >> 16) & 0xff;
+        int g = (argb >> 8) & 0xff;
+        int b = argb & 0xff;
+    
+        if (a < 10) {
+            return true;
+        }
+    
+        // 白底
+        if (r > 235 && g > 235 && b > 235) {
+            return true;
+        }
+    
+        // 淺灰底 / 棋盤格背景
+        if (Math.abs(r - g) < 10 && Math.abs(g - b) < 10 && r >= 170 && r <= 245) {
+            return true;
+        }
+    
+        return false;
+    }
     private void refreshWeaponList() {
         moneyLabel.setText("Money: $" + InventoryManager.getMoney());
 
@@ -163,7 +287,7 @@ public class WeaponShopScreen extends JPanel {
         }
 
         if (bossImage != null) {
-            g2d.drawImage(bossImage, 120, 220, 480, 580, this);
+            g2d.drawImage(bossImage, bossX, bossY, bossW, bossH, this);
         }
 
         g2d.setColor(new Color(0, 0, 0, 180));
@@ -173,8 +297,15 @@ public class WeaponShopScreen extends JPanel {
         g2d.setFont(new Font("Monospaced", Font.BOLD, 28));
         g2d.drawString("BLACKSMITH - WEAPON SHOP", 1020, 105);
 
+        g2d.setColor(new Color(0, 0, 0, 180));
+        g2d.fillRoundRect(50, 750, 1500, 120, 30, 30);
+
+        g2d.setColor(new Color(200, 150, 50));
+        g2d.setStroke(new BasicStroke(4));
+        g2d.drawRoundRect(50, 750, 1500, 120, 30, 30);
+ 
         g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
-        g2d.drawString("鐵匠：想換更猛的傢伙？錢夠就自己挑。", 100, 820);
+        g2d.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
+        g2d.drawString(bossLines[currentBossLine], 100, 820);  
     }
 }
