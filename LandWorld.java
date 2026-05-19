@@ -38,6 +38,9 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(930, 360, 180, 140)
     };
 
+    // Blacksmith / 武器商店範圍
+    private Rectangle blacksmithZone = new Rectangle(390, 220, 230, 330);
+
     // 右下 Dive Zone
     private Rectangle diveZone = new Rectangle(1150, 600, 250, 250);
 
@@ -48,17 +51,20 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private ActionListener onEnterShop;
     private ActionListener onEnterHeadquarters;
     private ActionListener onEnterBeach;
+    private ActionListener onEnterBlacksmith;
 
     public LandWorld(
         ActionListener onDive,
         ActionListener onEnterShop,
         ActionListener onEnterHeadquarters,
-        ActionListener onEnterBeach
+        ActionListener onEnterBeach,
+        ActionListener onEnterBlacksmith
     ) {
         this.onDive = onDive;
         this.onEnterShop = onEnterShop;
         this.onEnterHeadquarters = onEnterHeadquarters;
         this.onEnterBeach = onEnterBeach;
+        this.onEnterBlacksmith = onEnterBlacksmith;
 
         setLayout(null);
         setFocusable(true);
@@ -176,6 +182,10 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private boolean isInCoastZone(Rectangle playerRect) {
         return playerRect.intersects(coastZone);
     }
+    
+    private boolean isInBlacksmithZone(Rectangle playerRect) {
+        return playerRect.intersects(blacksmithZone);
+    }
 
     @Override
     protected void paintComponent(Graphics g) {
@@ -238,7 +248,9 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 22));
 
-        if (isInHeadquartersZone(pRect)) {
+        if (isInBlacksmithZone(pRect)) {
+            g.drawString("Press ENTER to Blacksmith", (int) playerX - 70, (int) playerY - 20);
+        } else if (isInHeadquartersZone(pRect)) {
             g.drawString("Press ENTER to Headquarters", (int) playerX - 50, (int) playerY - 20);
         } else if (isInShopZone(pRect)) {
             g.drawString("Press ENTER to Shop", (int) playerX - 30, (int) playerY - 20);
@@ -277,7 +289,11 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 PLAYER_HEIGHT
             );
 
-            if (isInHeadquartersZone(pRect)) {
+            if (isInBlacksmithZone(pRect)) {
+                onEnterBlacksmith.actionPerformed(null);
+            } else if (isInHeadquartersZone(pRect)) {
+                onEnterHeadquarters.actionPerformed(null);
+            } else if (isInShopZone(pRect)) {
                 onEnterHeadquarters.actionPerformed(null);
             } else if (isInShopZone(pRect)) {
                 onEnterShop.actionPerformed(null);

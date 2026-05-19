@@ -69,6 +69,8 @@ public class OceanWorld extends JPanel {
     }
 
     public void resetPlayerPosition() {
+        reloadOwnedWeapons();
+
         this.playerX = SCREEN_WIDTH / 2.0 - (PLAYER_WIDTH / 2.0);
         this.playerY = 600;
 
@@ -101,18 +103,21 @@ public class OceanWorld extends JPanel {
     }
 
     private void setupWeapons() {
+        reloadOwnedWeapons();
+    }
+    
+    private void reloadOwnedWeapons() {
         weaponList.clear();
-
-        weaponList.add(new Weapon("初級魚槍", 1, 600));
-        weaponList.add(new Weapon("水下步槍", 2, 750));
-        weaponList.add(new Weapon("狙擊槍", 6, 1300));
-        weaponList.add(new Weapon("網槍", 1, 500));
-        weaponList.add(new Weapon("睡眠槍", 1, 650));
-        weaponList.add(new Weapon("麻醉槍", 1, 650));
-        weaponList.add(new Weapon("榴彈發射器", 8, 450));
-        weaponList.add(new Weapon("寒冰槍", 2, 700));
-
-        currentWeaponIndex = 0;
+        weaponList.addAll(WeaponManager.getOwnedWeapons());
+    
+        if (weaponList.isEmpty()) {
+            weaponList.add(new Weapon("初級魚槍", 1, 600));
+        }
+    
+        if (currentWeaponIndex < 0 || currentWeaponIndex >= weaponList.size()) {
+            currentWeaponIndex = 0;
+        }
+    
         currentWeapon = weaponList.get(currentWeaponIndex);
     }
 
@@ -208,18 +213,20 @@ public class OceanWorld extends JPanel {
     }
 
     private void switchWeapon(int direction) {
+        reloadOwnedWeapons();
+    
         if (weaponList.isEmpty()) {
             return;
         }
-
+    
         currentWeaponIndex += direction;
-
+    
         if (currentWeaponIndex < 0) {
             currentWeaponIndex = weaponList.size() - 1;
         } else if (currentWeaponIndex >= weaponList.size()) {
             currentWeaponIndex = 0;
         }
-
+    
         currentWeapon = weaponList.get(currentWeaponIndex);
     }
 

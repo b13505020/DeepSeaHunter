@@ -14,6 +14,7 @@ public class GameLauncher extends JFrame {
     private LandWorld landPanel;
     private OceanWorld oceanPanel;
     private GearShopScreen gearShopPanel;
+    private WeaponShopScreen weaponShopPanel;
     private BeachWorld beachPanel;
 
     private JPanel titlePanel;
@@ -67,6 +68,11 @@ public class GameLauncher extends JFrame {
             SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
         });
 
+        weaponShopPanel = new WeaponShopScreen(e -> {
+            cardLayout.show(mainPanel, "LandScreen");
+            SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
+        });
+
         beachPanel = new BeachWorld(e -> {
             cardLayout.show(mainPanel, "LandScreen");
             SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
@@ -90,6 +96,10 @@ public class GameLauncher extends JFrame {
                 beachPanel.resetForEntry();
                 cardLayout.show(mainPanel, "BeachScreen");
                 SwingUtilities.invokeLater(() -> beachPanel.requestFocusInWindow());
+            },
+            e -> {
+                cardLayout.show(mainPanel, "WeaponShopScreen");
+                SwingUtilities.invokeLater(() -> weaponShopPanel.requestFocusInWindow());
             }
         );
 
@@ -97,6 +107,7 @@ public class GameLauncher extends JFrame {
         mainPanel.add(landPanel, "LandScreen");
         mainPanel.add(oceanPanel, "OceanScreen");
         mainPanel.add(gearShopPanel, "GearShopScreen");
+        mainPanel.add(weaponShopPanel, "WeaponShopScreen");
         mainPanel.add(beachPanel, "BeachScreen");
 
         mainPanel.revalidate();

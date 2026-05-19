@@ -484,6 +484,7 @@ public class InventoryManager {
             data.storageMaterials = new LinkedHashMap<>(storageMaterialMap);
 
             data.unlockedFish = CollectionManager.getUnlockedFishSnapshot();
+            data.ownedWeapons = WeaponManager.getOwnedWeaponNamesSnapshot();
 
             ObjectOutputStream out = new ObjectOutputStream(
                 new FileOutputStream(SAVE_FILE)
@@ -537,6 +538,7 @@ public class InventoryManager {
             storageMaterialMap = normalizeMaterialMap(data.storageMaterials);
 
             CollectionManager.setUnlockedFish(data.unlockedFish);
+            WeaponManager.setOwnedWeaponNames(data.ownedWeapons);
 
             System.out.println("✅ 讀取存檔成功：" + SAVE_FILE);
             return true;
@@ -562,6 +564,7 @@ public class InventoryManager {
         backpackLevel = 1;
 
         CollectionManager.resetUnlockedFish();
+        WeaponManager.resetOwnedWeapons();
 
         System.out.println("已建立新遊戲資料");
     }

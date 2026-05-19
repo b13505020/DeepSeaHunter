@@ -22,6 +22,7 @@ public class SaveData implements Serializable {
     Map<String, Integer> storageMaterials;
 
     Set<String> unlockedFish;
+    Set<String> ownedWeapons;
 
     public SaveData() {
         storageList = new ArrayList<>();
@@ -31,5 +32,6 @@ public class SaveData implements Serializable {
         storageMaterials = new LinkedHashMap<>();
 
         unlockedFish = new HashSet<>();
+        ownedWeapons = new HashSet<>();
     }
 }
