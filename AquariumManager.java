@@ -1,5 +1,7 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AquariumManager {
 
@@ -7,11 +9,19 @@ public class AquariumManager {
         private Fish fish;
         private int hunger;
         private int maxHunger;
+        private boolean baby;
+        private long bornTime;
 
         public AquariumFish(Fish fish) {
+            this(fish, false);
+        }
+
+        public AquariumFish(Fish fish, boolean baby) {
             this.fish = fish;
             this.maxHunger = 100;
             this.hunger = 55;
+            this.baby = baby;
+            this.bornTime = System.currentTimeMillis();
         }
 
         public Fish getFish() {
@@ -24,6 +34,14 @@ public class AquariumManager {
 
         public int getMaxHunger() {
             return maxHunger;
+        }
+
+        public boolean isBaby() {
+            return baby;
+        }
+
+        public long getBornTime() {
+            return bornTime;
         }
 
         public void feed(int amount) {
@@ -53,12 +71,18 @@ public class AquariumManager {
     private static long lastPassiveUpdateTime = System.currentTimeMillis();
     private static int lastPassiveIncome = 0;
 
+    private static Map<String, Long> lastBreedTimeMap = new HashMap<>();
+    private static String lastBreedMessage = "";
+
+    private static final long PASSIVE_INTERVAL_MS = 60000;
+    private static final long BREED_INTERVAL_MS = 20 * 60 * 1000;
+
     public static void addFish(Fish fish) {
         if (fish == null) {
             return;
         }
 
-        aquariumFishList.add(new AquariumFish(fish));
+        aquariumFishList.add(new AquariumFish(fish, false));
     }
 
     public static List<AquariumFish> getAquariumFishList() {
@@ -104,43 +128,106 @@ public class AquariumManager {
         return fullness;
     }
 
+    public static int getPassiveIncomeForFish(AquariumFish entry) {
+        if (entry == null || entry.getFish() == null) {
+            return 0;
+        }
+
+        Fish fish = entry.getFish();
+
+        int rarity = Math.max(1, fish.getRarityStars());
+        int nameBonus = Math.abs(fish.getName().hashCode()) % 12;
+        int baseIncome = Math.max(3, fish.getPrice() / 25 + rarity * 4 + nameBonus);
+
+        if (entry.isBaby()) {
+            baseIncome = Math.max(1, baseIncome / 2);
+        }
+
+        int fullness = getFullness(entry);
+
+        if (fullness <= 10) {
+            baseIncome = 0;
+        } else if (fullness <= 35) {
+            baseIncome = baseIncome / 2;
+        }
+
+        return baseIncome;
+    }
+
     public static int calculatePassiveIncomePerMinute() {
         int total = 0;
 
         for (AquariumFish entry : aquariumFishList) {
-            Fish fish = entry.getFish();
-
-            int rarity = Math.max(1, fish.getRarityStars());
-            int baseIncome = Math.max(3, fish.getPrice() / 25 + rarity * 4);
-            int fullness = getFullness(entry);
-
-            if (fullness <= 10) {
-                baseIncome = 0;
-            } else if (fullness <= 35) {
-                baseIncome = baseIncome / 2;
-            }
-
-            total += baseIncome;
+            total += getPassiveIncomeForFish(entry);
         }
 
         return total;
     }
 
-    // 這個方法會讓被動收入在所有畫面都能運作。
+    // 讓被動收入在所有畫面都能運作。
     // MissionHudOverlay 和 AquariumView 都可以呼叫它。
     public static void updatePassiveIncomeSystem() {
         long now = System.currentTimeMillis();
 
-        while (now - lastPassiveUpdateTime >= 60000) {
+        while (now - lastPassiveUpdateTime >= PASSIVE_INTERVAL_MS) {
             increaseAllHungerSlowly();
+            updateBreedingSystem();
+
             lastPassiveIncome = calculatePassiveIncomePerMinute();
 
             if (lastPassiveIncome > 0) {
                 InventoryManager.addMoney(lastPassiveIncome);
             }
 
-            lastPassiveUpdateTime += 60000;
+            lastPassiveUpdateTime += PASSIVE_INTERVAL_MS;
         }
+
+        // 就算還沒到一分鐘，也檢查繁殖時間，避免剛好錯過。
+        updateBreedingSystem();
+    }
+
+    private static void updateBreedingSystem() {
+        long now = System.currentTimeMillis();
+
+        Map<String, Integer> speciesCount = new HashMap<>();
+        Map<String, Fish> speciesTemplate = new HashMap<>();
+
+        for (AquariumFish entry : aquariumFishList) {
+            String name = entry.getFish().getName();
+
+            speciesCount.put(name, speciesCount.getOrDefault(name, 0) + 1);
+            speciesTemplate.putIfAbsent(name, entry.getFish());
+        }
+
+        for (String name : speciesCount.keySet()) {
+            int count = speciesCount.get(name);
+
+            if (count < 2) {
+                continue;
+            }
+
+            long lastBreed = lastBreedTimeMap.getOrDefault(name, now);
+
+            // 第一次湊到 2 隻時，從現在開始計時 20 分鐘。
+            if (!lastBreedTimeMap.containsKey(name)) {
+                lastBreedTimeMap.put(name, now);
+                continue;
+            }
+
+            if (now - lastBreed >= BREED_INTERVAL_MS) {
+                Fish template = speciesTemplate.get(name);
+
+                if (template != null) {
+                    aquariumFishList.add(new AquariumFish(template, true));
+                    lastBreedTimeMap.put(name, now);
+                    lastBreedMessage = name + " 生出了一隻小魚。";
+                }
+            }
+        }
+    }
+
+    public static String getLastBreedMessage() {
+        return lastBreedMessage;
     }
 
     public static int getLastPassiveIncome() {

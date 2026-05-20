@@ -57,11 +57,15 @@ public class AquariumView extends JFrame {
         private boolean guideHovered = false;
         private boolean feedShopVisible = false;
         private String selectedFeedType = "basic";
-        private String message = "歡迎來到水族館。點下方小朋友可以打開飼料介面。";
+        private String message = "歡迎來到水族館。點導覽員可以把儲藏箱的魚放進水族館。";
 
-        private Rectangle guideRect = new Rectangle(1375, 640, 135, 190);
+        // 導覽員已改到飼料攤左下方，不會被右下被動收入面板擋住
+        private Rectangle guideRect = new Rectangle(1085, 515, 120, 170);
+
         private Rectangle buyButtonRect = new Rectangle(1210, 555, 145, 50);
         private Rectangle feedButtonRect = new Rectangle(1370, 555, 145, 50);
+        private Rectangle feedShopCloseRect = new Rectangle(1500, 172, 28, 28);
+        private Rectangle exitButtonRect = new Rectangle(55, 790, 160, 52);
 
         // 依你的背景圖調整：魚和飼料都限制在水族箱範圍內
         private Rectangle tankRect = new Rectangle(75, 90, 1060, 545);
@@ -135,7 +139,6 @@ public class AquariumView extends JFrame {
         private void createVisitors() {
             visitors.clear();
 
-            // 觀眾刻意做成不規則排列：不同高度、不同大小、不同前後位置
             visitors.add(new VisitorNpc(visitor1Img, 75, 628, 74, 126, 12));
             visitors.add(new VisitorNpc(visitor2Img, 168, 606, 63, 110, 55));
             visitors.add(new VisitorNpc(visitor3Img, 250, 638, 82, 136, 98));
@@ -158,14 +161,7 @@ public class AquariumView extends JFrame {
         }
 
         private int getFullness(AquariumManager.AquariumFish entry) {
-            int fullness = 100 - entry.getHunger();
-            if (fullness < 0) {
-                fullness = 0;
-            }
-            if (fullness > 100) {
-                fullness = 100;
-            }
-            return fullness;
+            return AquariumManager.getFullness(entry);
         }
 
         private void updateFallingFeed() {
@@ -319,6 +315,7 @@ public class AquariumView extends JFrame {
             }
 
             drawIncomePanel(g2);
+            drawExitButton(g2);
             drawBottomFishInfo(g2);
             drawGuideSpeech(g2);
             drawMessage(g2);
@@ -368,9 +365,18 @@ public class AquariumView extends JFrame {
         }
 
         private Color getFeedColor(String feedType) {
-            if (feedType.equals("premium")) return new Color(230, 190, 70);
-            if (feedType.equals("color")) return new Color(220, 80, 100);
-            if (feedType.equals("growth")) return new Color(95, 210, 95);
+            if (feedType.equals("premium")) {
+                return new Color(230, 190, 70);
+            }
+
+            if (feedType.equals("color")) {
+                return new Color(220, 80, 100);
+            }
+
+            if (feedType.equals("growth")) {
+                return new Color(95, 210, 95);
+            }
+
             return new Color(190, 115, 42);
         }
 
@@ -538,6 +544,7 @@ public class AquariumView extends JFrame {
 
         private void drawProgramFeedShop(Graphics2D g2) {
             drawPanel(g2, 1190, 160, 350, 455);
+            drawFeedShopCloseButton(g2);
 
             g2.setFont(new Font("Serif", Font.BOLD, 31));
             g2.setColor(new Color(0, 0, 0, 150));
@@ -559,6 +566,19 @@ public class AquariumView extends JFrame {
             g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
             g2.setColor(new Color(220, 235, 235));
             g2.drawString("目前選擇：" + AquariumManager.getFeedName(selectedFeedType), 1220, 628);
+        }
+
+        private void drawFeedShopCloseButton(Graphics2D g2) {
+            Point mouse = getMousePositionSafe();
+            boolean hover = feedShopCloseRect.contains(mouse);
+
+            g2.setColor(hover ? new Color(185, 70, 58) : new Color(115, 48, 40));
+            g2.fillOval(feedShopCloseRect.x, feedShopCloseRect.y, feedShopCloseRect.width, feedShopCloseRect.height);
+
+            g2.setColor(new Color(255, 230, 170));
+            g2.setStroke(new BasicStroke(3));
+            g2.drawLine(feedShopCloseRect.x + 8, feedShopCloseRect.y + 8, feedShopCloseRect.x + 20, feedShopCloseRect.y + 20);
+            g2.drawLine(feedShopCloseRect.x + 20, feedShopCloseRect.y + 8, feedShopCloseRect.x + 8, feedShopCloseRect.y + 20);
         }
 
         private void drawActionButton(Graphics2D g2, Rectangle rect, String text, Color top, Color bottom) {
@@ -596,46 +616,54 @@ public class AquariumView extends JFrame {
             boolean selected = button.feedType.equals(selectedFeedType);
             boolean hover = button.hover;
 
-            Color top = selected ? new Color(40, 105, 125, 235) : new Color(12, 48, 62, 230);
-            Color bottom = selected ? new Color(10, 55, 75, 235) : new Color(5, 24, 34, 230);
+            Color top = selected ? new Color(50, 125, 145, 240) : new Color(16, 52, 66, 235);
+            Color bottom = selected ? new Color(12, 60, 80, 240) : new Color(5, 24, 34, 235);
 
             g2.setPaint(new GradientPaint(button.x, button.y, top, button.x, button.y + button.h, bottom));
-            g2.fillRoundRect(button.x, button.y, button.w, button.h, 16, 16);
+            g2.fillRoundRect(button.x, button.y, button.w, button.h, 18, 18);
 
             g2.setColor(selected ? new Color(255, 225, 120) : new Color(190, 135, 55));
             g2.setStroke(new BasicStroke(selected ? 4 : 2));
-            g2.drawRoundRect(button.x + 2, button.y + 2, button.w - 4, button.h - 4, 16, 16);
+            g2.drawRoundRect(button.x + 2, button.y + 2, button.w - 4, button.h - 4, 18, 18);
 
             if (hover) {
-                g2.setColor(new Color(255, 240, 130, 45));
-                g2.fillRoundRect(button.x + 5, button.y + 5, button.w - 10, button.h - 10, 12, 12);
+                g2.setColor(new Color(255, 240, 130, 55));
+                g2.fillRoundRect(button.x + 5, button.y + 5, button.w - 10, button.h - 10, 14, 14);
             }
 
-            drawFeedIcon(g2, button.x + 14, button.y + 18, button.feedType);
+            drawFeedIcon(g2, button.x + 13, button.y + 16, button.feedType);
 
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
             g2.setColor(new Color(255, 230, 150));
-            g2.drawString(button.title, button.x + 52, button.y + 26);
+            g2.drawString(button.title, button.x + 52, button.y + 25);
 
             g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
             g2.setColor(new Color(200, 230, 235));
-            g2.drawString("$" + AquariumManager.getFeedPrice(button.feedType), button.x + 52, button.y + 48);
+            g2.drawString("$" + AquariumManager.getFeedPrice(button.feedType), button.x + 52, button.y + 47);
             g2.drawString("庫存：" + AquariumManager.getFeedCount(button.feedType), button.x + 52, button.y + 67);
         }
 
         private void drawFeedIcon(Graphics2D g2, int x, int y, String feedType) {
-            Color c = getFeedColor(feedType);
+            Color feedColor = getFeedColor(feedType);
 
-            g2.setColor(new Color(65, 38, 20));
-            g2.fillRoundRect(x, y, 26, 40, 8, 8);
-            g2.setColor(new Color(220, 185, 120));
-            g2.fillOval(x + 2, y - 4, 22, 9);
-            g2.setColor(c);
-            for (int i = 0; i < 10; i++) {
-                int px = x + 5 + (i * 7) % 17;
-                int py = y + 12 + (i * 5) % 22;
+            g2.setColor(new Color(0, 0, 0, 90));
+            g2.fillOval(x - 2, y + 36, 34, 8);
+
+            g2.setPaint(new GradientPaint(x, y, new Color(110, 160, 170), x, y + 40, new Color(36, 62, 70)));
+            g2.fillRoundRect(x, y, 30, 42, 9, 9);
+
+            g2.setColor(new Color(225, 185, 95));
+            g2.fillRoundRect(x + 2, y - 5, 26, 10, 5, 5);
+
+            g2.setColor(feedColor);
+            for (int i = 0; i < 12; i++) {
+                int px = x + 6 + (i * 7) % 18;
+                int py = y + 14 + (i * 5) % 22;
                 g2.fillOval(px, py, 5, 5);
             }
+
+            g2.setColor(new Color(255, 255, 255, 70));
+            g2.drawLine(x + 6, y + 7, x + 6, y + 32);
         }
 
         private void drawIncomePanel(Graphics2D g2) {
@@ -657,6 +685,10 @@ public class AquariumView extends JFrame {
             g2.drawString("下次結算：約 " + AquariumManager.getSecondsToNextPassiveIncome() + " 秒", 1370, 740);
         }
 
+        private void drawExitButton(Graphics2D g2) {
+            drawActionButton(g2, exitButtonRect, "離開水族館", new Color(78, 52, 36), new Color(35, 24, 18));
+        }
+
         private void drawBottomFishInfo(Graphics2D g2) {
             drawPanel(g2, 430, 760, 720, 92);
 
@@ -667,7 +699,7 @@ public class AquariumView extends JFrame {
                 g2.drawString("將滑鼠移到魚身上查看狀態", 575, 805);
                 g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
                 g2.setColor(new Color(180, 230, 240));
-                g2.drawString("點下方小朋友開啟飼料介面。選擇飼料後按餵食，飼料會掉入水中。", 485, 832);
+                g2.drawString("點導覽員管理魚。點小朋友開啟飼料介面。選飼料後按餵食。", 505, 832);
                 return;
             }
 
@@ -675,6 +707,11 @@ public class AquariumView extends JFrame {
             String fishName = entry.getFish().getName();
             int hunger = entry.getHunger();
             int fullness = getFullness(entry);
+            int income = AquariumManager.getPassiveIncomeForFish(entry);
+
+            if (entry.isBaby()) {
+                fishName += "（小魚）";
+            }
 
             g2.drawString(fishName, 500, 797);
 
@@ -684,7 +721,7 @@ public class AquariumView extends JFrame {
 
             int barX = 575;
             int barY = 817;
-            int barW = 260;
+            int barW = 230;
             int barH = 18;
 
             g2.setColor(new Color(20, 28, 32));
@@ -699,10 +736,11 @@ public class AquariumView extends JFrame {
 
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
             g2.setColor(new Color(255, 225, 135));
-            g2.drawString(fullness + "%", 850, 832);
+            g2.drawString(fullness + "%", 820, 832);
 
             g2.setColor(new Color(200, 230, 235));
-            g2.drawString("飢餓值 " + hunger + "%", 920, 832);
+            g2.drawString("飢餓值 " + hunger + "%", 880, 832);
+            g2.drawString("收入 $" + income + "/分", 1000, 832);
         }
 
         private void drawGuideSpeech(Graphics2D g2) {
@@ -710,22 +748,23 @@ public class AquariumView extends JFrame {
                 return;
             }
 
-            drawPanel(g2, 1095, 615, 330, 92);
+            drawPanel(g2, 835, 475, 330, 92);
+
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
             g2.setColor(new Color(255, 225, 135));
-            g2.drawString("導覽員", 1120, 647);
+            g2.drawString("導覽員", 860, 507);
 
             g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 15));
             g2.setColor(new Color(225, 240, 240));
-            g2.drawString(getGuideLine(), 1120, 677);
+            g2.drawString(getGuideLine(), 860, 537);
         }
 
         private String getGuideLine() {
             String[] lines = {
-                "飼料不是直接餵，會先掉進水裡喔。",
+                "點我可以管理儲藏箱，把魚放進水族館。",
+                "同品種有兩隻以上，20 分鐘會生小魚。",
                 "飽食度越高，魚的被動收入越穩定。",
-                "稀有魚通常會帶來更高的水族館收益。",
-                "如果魚太餓，水族館收入會下降。"
+                "餵食後飼料會掉進水裡，魚會自己去吃。"
             };
             return lines[(tick / 120) % lines.length];
         }
@@ -786,6 +825,24 @@ public class AquariumView extends JFrame {
         public void mouseClicked(MouseEvent e) {
             Point p = e.getPoint();
 
+            if (exitButtonRect.contains(p)) {
+                dispose();
+                return;
+            }
+
+            if (guideRect.contains(p)) {
+                openAquariumNpcDialog();
+                repaint();
+                return;
+            }
+
+            if (feedShopVisible && feedShopCloseRect.contains(p)) {
+                feedShopVisible = false;
+                message = "已關閉飼料介面。點下方小朋友可以再次開啟。";
+                repaint();
+                return;
+            }
+
             for (VisitorNpc visitor : visitors) {
                 Rectangle visitorRect = new Rectangle(visitor.x - 10, visitor.y - 10, visitor.w + 20, visitor.h + 20);
 
@@ -798,7 +855,7 @@ public class AquariumView extends JFrame {
             }
 
             if (!feedShopVisible) {
-                message = "請先點水族箱下方的小朋友，開啟飼料介面。";
+                message = "請先點水族箱下方的小朋友，開啟飼料介面。或點導覽員管理魚。";
                 repaint();
                 return;
             }
@@ -830,6 +887,17 @@ public class AquariumView extends JFrame {
                 dropSelectedFeed();
                 repaint();
             }
+        }
+
+        private void openAquariumNpcDialog() {
+            AquariumNpcDialog dialog = new AquariumNpcDialog(AquariumView.this, this);
+            dialog.setVisible(true);
+        }
+
+        private void refreshAquariumFishAfterStorageChange() {
+            createDisplayFish();
+            message = "水族館魚群已更新。";
+            repaint();
         }
 
         private void dropSelectedFeed() {
@@ -880,6 +948,225 @@ public class AquariumView extends JFrame {
         @Override public void keyTyped(KeyEvent e) {}
     }
 
+    class AquariumNpcDialog extends JDialog {
+
+        private AquariumPanel aquariumPanel;
+        private DefaultListModel<Fish> listModel;
+        private JList<Fish> fishList;
+        private JLabel statusLabel;
+
+        public AquariumNpcDialog(JFrame owner, AquariumPanel aquariumPanel) {
+            super(owner, "導覽員 - 魚隻管理", true);
+            this.aquariumPanel = aquariumPanel;
+
+            setSize(620, 500);
+            setLocationRelativeTo(owner);
+            setLayout(new BorderLayout(12, 12));
+
+            JPanel root = new JPanel(new BorderLayout(12, 12));
+            root.setBackground(new Color(20, 30, 40));
+            root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+            JLabel titleLabel = new JLabel("選擇儲藏箱中的魚，可以放入水族館或賣掉");
+            titleLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
+            titleLabel.setForeground(new Color(255, 220, 130));
+            root.add(titleLabel, BorderLayout.NORTH);
+
+            listModel = new DefaultListModel<>();
+            fishList = new JList<>(listModel);
+            fishList.setCellRenderer(new FishRenderer());
+            fishList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            fishList.setFixedCellHeight(80);
+            fishList.setBackground(new Color(35, 45, 58));
+
+            JScrollPane scrollPane = new JScrollPane(fishList);
+            scrollPane.setBorder(BorderFactory.createLineBorder(new Color(210, 145, 58), 2));
+            root.add(scrollPane, BorderLayout.CENTER);
+
+            JPanel bottomPanel = new JPanel(new BorderLayout(0, 12));
+            bottomPanel.setOpaque(false);
+
+            JPanel buttonPanel = new JPanel(new GridLayout(1, 4, 10, 10));
+            buttonPanel.setOpaque(false);
+
+            JButton putButton = createDialogButton("放入水族館");
+            JButton sellButton = createDialogButton("賣掉選取魚");
+            JButton sellAllButton = createDialogButton("全部賣掉");
+            JButton closeButton = createDialogButton("關閉");
+
+            putButton.addActionListener(e -> putSelectedFishIntoAquarium());
+            sellButton.addActionListener(e -> sellSelectedFish());
+            sellAllButton.addActionListener(e -> sellAllFish());
+            closeButton.addActionListener(e -> dispose());
+
+            buttonPanel.add(putButton);
+            buttonPanel.add(sellButton);
+            buttonPanel.add(sellAllButton);
+            buttonPanel.add(closeButton);
+
+            statusLabel = new JLabel("導覽員：把魚放進水族館後，就會開始提供被動收入。");
+            statusLabel.setForeground(new Color(220, 235, 235));
+            statusLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+
+            bottomPanel.add(buttonPanel, BorderLayout.CENTER);
+            bottomPanel.add(statusLabel, BorderLayout.SOUTH);
+
+            root.add(bottomPanel, BorderLayout.SOUTH);
+
+            add(root);
+            reloadStorageFish();
+        }
+
+        private JButton createDialogButton(String text) {
+            JButton button = new JButton(text);
+            button.setFocusPainted(false);
+            button.setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
+            button.setBackground(new Color(18, 70, 92));
+            button.setForeground(new Color(255, 235, 170));
+            button.setBorder(BorderFactory.createLineBorder(new Color(210, 145, 58), 2));
+            return button;
+        }
+
+        private void reloadStorageFish() {
+            listModel.clear();
+
+            for (Fish fish : InventoryManager.getStorage()) {
+                listModel.addElement(fish);
+            }
+        }
+
+        private void putSelectedFishIntoAquarium() {
+            Fish selected = fishList.getSelectedValue();
+
+            if (selected == null) {
+                statusLabel.setText("請先選一隻魚。");
+                return;
+            }
+
+            boolean removed = InventoryManager.getStorage().remove(selected);
+
+            if (!removed) {
+                statusLabel.setText("放入失敗，這隻魚可能已經不在儲藏箱。");
+                reloadStorageFish();
+                return;
+            }
+
+            AquariumManager.addFish(selected);
+            aquariumPanel.refreshAquariumFishAfterStorageChange();
+            reloadStorageFish();
+            statusLabel.setText("已將「" + selected.getName() + "」放入水族館。");
+        }
+
+        private void sellSelectedFish() {
+            Fish selected = fishList.getSelectedValue();
+
+            if (selected == null) {
+                statusLabel.setText("請先選一隻要賣的魚。");
+                return;
+            }
+
+            int price = InventoryManager.sellFish(selected);
+            reloadStorageFish();
+
+            if (price > 0) {
+                statusLabel.setText("已賣掉「" + selected.getName() + "」，獲得 $" + price + "。");
+            } else {
+                statusLabel.setText("賣出失敗，這隻魚可能已經不在儲藏箱。");
+            }
+        }
+
+        private void sellAllFish() {
+            if (InventoryManager.getStorage().isEmpty()) {
+                statusLabel.setText("儲藏箱目前沒有魚可以賣。");
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "確定要賣掉儲藏箱裡全部的魚嗎？",
+                "確認全部賣掉",
+                JOptionPane.YES_NO_OPTION
+            );
+
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+
+            int total = InventoryManager.sellAllStorageFish();
+            reloadStorageFish();
+            statusLabel.setText("已賣掉全部魚，獲得 $" + total + "。");
+        }
+
+        private String buildStars(int count) {
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < count; i++) {
+                sb.append("★");
+            }
+
+            return sb.toString();
+        }
+
+        class FishRenderer extends JPanel implements ListCellRenderer<Fish> {
+            private JLabel iconLabel = new JLabel();
+            private JLabel nameLabel = new JLabel();
+            private JLabel infoLabel = new JLabel();
+
+            public FishRenderer() {
+                setLayout(new BorderLayout(12, 0));
+                setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+
+                iconLabel.setPreferredSize(new Dimension(72, 60));
+                iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+                JPanel textPanel = new JPanel(new GridLayout(2, 1));
+                textPanel.setOpaque(false);
+
+                nameLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 17));
+                infoLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 13));
+
+                textPanel.add(nameLabel);
+                textPanel.add(infoLabel);
+
+                add(iconLabel, BorderLayout.WEST);
+                add(textPanel, BorderLayout.CENTER);
+            }
+
+            @Override
+            public Component getListCellRendererComponent(
+                JList<? extends Fish> list,
+                Fish fish,
+                int index,
+                boolean isSelected,
+                boolean cellHasFocus
+            ) {
+                setOpaque(true);
+                setBackground(isSelected ? new Color(28, 86, 108) : new Color(38, 47, 60));
+
+                ImageIcon rawIcon = new ImageIcon(fish.getImagePath());
+
+                if (rawIcon.getIconWidth() > 0) {
+                    Image scaled = rawIcon.getImage().getScaledInstance(60, 50, Image.SCALE_SMOOTH);
+                    iconLabel.setIcon(new ImageIcon(scaled));
+                    iconLabel.setText("");
+                } else {
+                    iconLabel.setIcon(null);
+                    iconLabel.setText("魚");
+                    iconLabel.setForeground(Color.WHITE);
+                }
+
+                nameLabel.setText(fish.getName());
+                nameLabel.setForeground(new Color(255, 230, 150));
+
+                int incomePreview = Math.max(3, fish.getPrice() / 25 + Math.max(1, fish.getRarityStars()) * 4);
+                infoLabel.setText("價格：$" + fish.getPrice() + "　稀有度：" + buildStars(fish.getRarityStars()) + "　預估收入：$" + incomePreview + "/分");
+                infoLabel.setForeground(new Color(205, 230, 235));
+
+                return this;
+            }
+        }
+    }
+
     static class DisplayFish {
         AquariumManager.AquariumFish entry;
         double x;
@@ -897,14 +1184,18 @@ public class AquariumView extends JFrame {
             this.direction = direction;
             this.waveOffset = (int) (Math.random() * 100);
             this.sizeBoost = Math.max(0, entry.getFish().getRarityStars() - 1) * 4;
+
+            if (entry.isBaby()) {
+                this.sizeBoost -= 12;
+            }
         }
 
         public int getWidth() {
-            return 70 + sizeBoost;
+            return Math.max(38, 70 + sizeBoost);
         }
 
         public int getHeight() {
-            return 54 + sizeBoost;
+            return Math.max(28, 54 + sizeBoost);
         }
 
         public Rectangle getBounds() {
