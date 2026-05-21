@@ -1,826 +1,1042 @@
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.*;
+import java.lang.reflect.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class MissionBoardView extends JFrame {
 
-    // 改成可以同時接多個任務
-    private static List<Mission> acceptedMissions = new ArrayList<>();
-
-    public MissionBoardView() {
-        setTitle("任務大廳 - Mission Board");
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setResizable(false);
-
-        MissionBoardPanel panel = new MissionBoardPanel();
-        setContentPane(panel);
-        pack();
-        setLocationRelativeTo(null);
-        setVisible(true);
-    }
-
-    public static List<Mission> getAcceptedMissions() {
-        return acceptedMissions;
-    }
-
-    public static String getAcceptedMissionTitle() {
-        if (acceptedMissions.isEmpty()) {
-            return "無";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < acceptedMissions.size(); i++) {
-            if (i > 0) {
-                sb.append("、");
-            }
-            sb.append(acceptedMissions.get(i).title);
-        }
-        return sb.toString();
-    }
-
-    // 之後 OceanWorld 或其他 class 可以呼叫這個來更新任務進度
-    public static void addMissionProgress(String type, int amount) {
-        for (Mission mission : acceptedMissions) {
-            if (mission.type.equals(type) && !mission.completed) {
-                mission.currentAmount += amount;
-
-                if (mission.currentAmount >= mission.targetAmount) {
-                    mission.currentAmount = mission.targetAmount;
-                    mission.completed = true;
-                }
-
-                return;
-            }
-        }
-    }
-
-    // 如果某個任務不需要累加進度，可以直接標記完成
-    public static void completeMission(String type) {
-        for (Mission mission : acceptedMissions) {
-            if (mission.type.equals(type)) {
-                mission.currentAmount = mission.targetAmount;
-                mission.completed = true;
-                return;
-            }
-        }
-    }
-
-    public static boolean isMissionCompleted(String type) {
-        for (Mission mission : acceptedMissions) {
-            if (mission.type.equals(type)) {
-                return mission.completed;
-            }
-        }
-        return false;
-    }
-
-    class MissionBoardPanel extends JPanel {
-
-        private static final int PANEL_WIDTH = 1600;
-        private static final int PANEL_HEIGHT = 900;
-
-        private final Color steelBlue = new Color(8, 30, 43);
-        private final Color copper = new Color(210, 145, 58);
-        private final Color gold = new Color(255, 216, 118);
-        private final Color cyan = new Color(105, 225, 255);
-
-        private List<Mission> missions = new ArrayList<>();
-        private Mission selectedMission = null;
-        private List<MissionCard> missionCards = new ArrayList<>();
-
-        private JScrollPane scrollPane;
-        private JPanel missionContainer;
-
-        private int animTick = 0;
-        private Timer animationTimer;
-
-        private Rectangle listBounds = new Rectangle(486, 214, 842, 492);
-        private Rectangle closeButtonBounds = new Rectangle(840, 776, 185, 58);
-        private Rectangle acceptButtonBounds = new Rectangle(1065, 776, 310, 58);
-
-        public MissionBoardPanel() {
-            setLayout(null);
-            setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
-            setFocusable(true);
-
-            createMissions();
-            setupMissionList();
-            setupButtons();
-            setupAnimation();
-            setupKeyActions();
-
-            SwingUtilities.invokeLater(() -> requestFocusInWindow());
-        }
-
-        private void createMissions() {
-            missions.add(new Mission(0, "捕捉沙丁魚", "前往淺海區捕捉 3 隻沙丁魚，完成潛水員基礎訓練。", "金幣 800", "CATCH_SARDINE", 3, "新手"));
-            missions.add(new Mission(1, "下潛到 500m", "進入海洋地圖並成功下潛到 500m 深度，確認潛水衣狀態。", "金幣 1200", "REACH_DEPTH_500", 500, "探索"));
-            missions.add(new Mission(2, "帶回小丑魚", "捕捉並帶回 1 隻小丑魚，交給水族館進行觀察。", "金幣 1500", "CATCH_CLOWNFISH", 1, "收集"));
-            missions.add(new Mission(3, "擊倒綠鰻魚", "深海區出現具攻擊性的綠鰻魚，請擊倒 1 隻並安全回收。", "金幣 2500", "DEFEAT_GREEN_EEL", 1, "戰鬥"));
-            missions.add(new Mission(4, "收集五種生物", "完成一次探索，捕捉並帶回 5 種不同海洋生物。", "金幣 3000", "COLLECT_5_SPECIES", 5, "收集"));
-            missions.add(new Mission(5, "探索深海基地", "下潛至深海基地附近，完成區域偵查後安全返回。", "金幣 3500", "EXPLORE_DEEP_BASE", 1, "探索"));
-            missions.add(new Mission(6, "高價魚獲回收", "單次下潛帶回總價值 3000 以上的魚獲。", "金幣 2200", "RETURN_VALUE_3000", 3000, "回收"));
-            missions.add(new Mission(7, "安全返航訓練", "完成一次下潛任務，並成功回到船上或陸地基地。", "金幣 1000", "SAFE_RETURN", 1, "新手"));
-        }
-
-        private void setupMissionList() {
-            missionContainer = new JPanel();
-            missionContainer.setOpaque(false);
-            missionContainer.setLayout(new BoxLayout(missionContainer, BoxLayout.Y_AXIS));
-            missionContainer.setBorder(new EmptyBorder(8, 8, 8, 8));
-
-            for (Mission mission : missions) {
-                MissionCard card = new MissionCard(mission);
-                missionCards.add(card);
-                missionContainer.add(card);
-                missionContainer.add(Box.createVerticalStrut(14));
-            }
-
-            scrollPane = new JScrollPane(missionContainer);
-            scrollPane.setBounds(listBounds);
-            scrollPane.setOpaque(false);
-            scrollPane.getViewport().setOpaque(false);
-            scrollPane.setBorder(BorderFactory.createEmptyBorder());
-            scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-            scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-            scrollPane.getVerticalScrollBar().setUnitIncrement(30);
-
-            add(scrollPane);
-        }
-
-        private void setupButtons() {
-            GameButton closeBtn = new GameButton("關閉");
-            closeBtn.setBounds(closeButtonBounds);
-            closeBtn.addActionListener(e -> dispose());
-
-            GameButton acceptBtn = new GameButton("接受選取任務");
-            acceptBtn.setBounds(acceptButtonBounds);
-            acceptBtn.addActionListener(e -> acceptSelectedMission());
-
-            add(closeBtn);
-            add(acceptBtn);
-        }
-
-        private void setupAnimation() {
-            animationTimer = new Timer(30, e -> {
-                animTick++;
-                repaint();
-            });
-            animationTimer.start();
-        }
-
-        private void setupKeyActions() {
-            addKeyListener(new KeyAdapter() {
-                @Override
-                public void keyPressed(KeyEvent e) {
-                    if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-                        dispose();
-                    }
-                }
-            });
-        }
-
-        private boolean isAccepted(Mission mission) {
-            for (Mission accepted : acceptedMissions) {
-                if (accepted.type.equals(mission.type)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private boolean isCompleted(Mission mission) {
-            for (Mission accepted : acceptedMissions) {
-                if (accepted.type.equals(mission.type)) {
-                    return accepted.completed;
-                }
-            }
-            return false;
-        }
-
-        private boolean isNextMission(Mission mission) {
-            return mission.order == acceptedMissions.size();
-        }
-
-        private void acceptSelectedMission() {
-            if (selectedMission == null) {
-                JOptionPane.showMessageDialog(this, "請先點選一個任務。", "尚未選擇任務", JOptionPane.WARNING_MESSAGE);
-                requestFocusInWindow();
-                return;
-            }
-
-            if (isAccepted(selectedMission)) {
-                JOptionPane.showMessageDialog(this, "這個任務已經接過了。", "任務已存在", JOptionPane.INFORMATION_MESSAGE);
-                requestFocusInWindow();
-                return;
-            }
-
-            if (!isNextMission(selectedMission)) {
-                Mission nextMission = missions.get(acceptedMissions.size());
-                JOptionPane.showMessageDialog(
-                    this,
-                    "任務必須照順序接取。\n\n下一個可接任務是：" + nextMission.title,
-                    "尚未解鎖",
-                    JOptionPane.WARNING_MESSAGE
-                );
-                requestFocusInWindow();
-                return;
-            }
-
-            acceptedMissions.add(selectedMission);
-
-            // 不再 dispose，所以玩家可以繼續接下一個任務
-            selectedMission = null;
-            refreshMissionList();
-            repaint();
-
-            JOptionPane.showMessageDialog(
-                this,
-                "已接受任務：\n" + acceptedMissions.get(acceptedMissions.size() - 1).title,
-                "任務已接受",
-                JOptionPane.INFORMATION_MESSAGE
-            );
-
-            requestFocusInWindow();
-        }
-
-        private void refreshMissionList() {
-            missionContainer.removeAll();
-            missionCards.clear();
-
-            for (Mission mission : missions) {
-                MissionCard card = new MissionCard(mission);
-                missionCards.add(card);
-                missionContainer.add(card);
-                missionContainer.add(Box.createVerticalStrut(14));
-            }
-
-            missionContainer.revalidate();
-            missionContainer.repaint();
-        }
-
-        private void selectMission(Mission mission) {
-            selectedMission = mission;
-            refreshMissionList();
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-            drawBackground(g2);
-            drawAnimatedWaterLight(g2);
-            drawOuterFrame(g2);
-            drawMainConsole(g2);
-            drawTitle(g2);
-            drawAcceptedMissionPanel(g2);
-            drawSidePanels(g2);
-            drawMissionHeader(g2);
-            drawBottomConsole(g2);
-            drawMissionOfficer(g2);
-            drawDiver(g2);
-            drawScrollIndicator(g2);
-            drawCornerDecorations(g2);
-            drawVignette(g2);
-
-            g2.dispose();
-        }
-
-        private void drawBackground(Graphics2D g2) {
-            GradientPaint bg = new GradientPaint(0, 0, new Color(1, 5, 11), 0, PANEL_HEIGHT, new Color(0, 1, 4));
-            g2.setPaint(bg);
-            g2.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
-
-            g2.setColor(new Color(9, 31, 44, 150));
-            for (int y = 0; y < PANEL_HEIGHT; y += 42) {
-                g2.drawLine(0, y, PANEL_WIDTH, y);
-            }
-            for (int x = 0; x < PANEL_WIDTH; x += 56) {
-                g2.drawLine(x, 0, x, PANEL_HEIGHT);
-            }
-
-            g2.setColor(new Color(255, 220, 120, 12));
-            for (int i = 0; i < 7; i++) {
-                int x = 190 + i * 210;
-                int y = 130 + (i % 3) * 210;
-                g2.drawOval(x, y, 160, 160);
-            }
-        }
-
-        private void drawAnimatedWaterLight(Graphics2D g2) {
-            RadialGradientPaint topLight = new RadialGradientPaint(
-                new Point2D.Double(PANEL_WIDTH / 2.0, 120),
-                680,
-                new float[]{0f, 0.45f, 1f},
-                new Color[]{new Color(0, 190, 255, 100), new Color(0, 90, 140, 30), new Color(0, 0, 0, 0)}
-            );
-            g2.setPaint(topLight);
-            g2.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
-
-            int scanY = 170 + (animTick * 2) % 540;
-            g2.setColor(new Color(255, 220, 120, 30));
-            g2.fillRect(420, scanY, 965, 2);
-
-            for (int i = 0; i < 34; i++) {
-                int x = 60 + i * 48;
-                int y = 60 + ((animTick + i * 29) % 800);
-                int r = 2 + (i % 5);
-                g2.setColor(new Color(70, 220, 255, 14 + (i % 4) * 7));
-                g2.fillOval(x, y, r, r);
-            }
-        }
-
-        private void drawOuterFrame(Graphics2D g2) {
-            g2.setStroke(new BasicStroke(20, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.setColor(new Color(47, 27, 12));
-            g2.drawLine(55, 76, 1545, 76);
-            g2.drawLine(55, 848, 1545, 848);
-            g2.drawLine(55, 82, 55, 842);
-            g2.drawLine(1545, 82, 1545, 842);
-
-            g2.setStroke(new BasicStroke(6));
-            g2.setColor(copper);
-            g2.drawLine(56, 63, 1544, 63);
-            g2.drawLine(56, 835, 1544, 835);
-            g2.drawLine(43, 82, 43, 842);
-            g2.drawLine(1532, 82, 1532, 842);
-
-            g2.setStroke(new BasicStroke(2));
-            g2.setColor(new Color(255, 232, 160, 120));
-            g2.drawLine(56, 53, 1544, 53);
-            g2.drawLine(56, 825, 1544, 825);
-
-            for (int x = 145; x < 1500; x += 180) {
-                drawBolt(g2, x, 75, 18);
-                drawBolt(g2, x, 850, 18);
-            }
-        }
-
-        private void drawMainConsole(Graphics2D g2) {
-            drawMetalPanel(g2, 94, 104, 1412, 736, 34, new Color(9, 29, 43, 240));
-            drawMetalPanel(g2, 420, 150, 965, 585, 30, new Color(6, 22, 35, 236));
-            drawMetalPanel(g2, 420, 750, 965, 82, 24, new Color(6, 22, 35, 238));
-
-            g2.setColor(new Color(0, 210, 255, 22));
-            g2.fillRoundRect(438, 168, 929, 548, 24, 24);
-
-            g2.setColor(new Color(255, 215, 120, 45));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(435, 165, 935, 555, 26, 26);
-        }
-
-        private void drawTitle(Graphics2D g2) {
-            drawMetalPanel(g2, 494, 26, 612, 108, 30, new Color(18, 52, 68, 242));
-
-            int pulse = 42 + (int) (Math.sin(animTick * 0.07) * 14);
-            g2.setColor(new Color(255, 210, 100, pulse));
-            g2.fillOval(765, 18, 70, 70);
-            drawBolt(g2, 800, 34, 36);
-
-            g2.setFont(new Font("Serif", Font.BOLD, 57));
-            g2.setColor(new Color(0, 0, 0, 170));
-            g2.drawString("MISSION BOARD", 558, 104);
-            g2.setColor(gold);
-            g2.drawString("MISSION BOARD", 552, 98);
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
-            g2.setColor(cyan);
-            g2.drawString("深海工域總部委託系統", 704, 125);
-            g2.setColor(new Color(255, 220, 120, 95));
-            g2.drawLine(575, 111, 1025, 111);
-        }
-
-        private void drawAcceptedMissionPanel(Graphics2D g2) {
-            drawMetalPanel(g2, 1125, 112, 315, 118, 22, new Color(8, 30, 43, 238));
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 19));
-            g2.setColor(gold);
-            g2.drawString("目前已接任務", 1150, 145);
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 15));
-            g2.setColor(new Color(190, 235, 245));
-
-            if (acceptedMissions.isEmpty()) {
-                g2.drawString("尚未接取任務", 1150, 175);
-                g2.drawString("請從第一個任務開始。", 1150, 198);
-            } else {
-                int y = 174;
-                int start = Math.max(0, acceptedMissions.size() - 3);
-                for (int i = start; i < acceptedMissions.size(); i++) {
-                    Mission m = acceptedMissions.get(i);
-                    String state = m.completed ? "完成" : (m.currentAmount + "/" + m.targetAmount);
-                    g2.drawString((i + 1) + ". " + m.title + "  [" + state + "]", 1150, y);
-                    y += 22;
-                }
-            }
-        }
-
-        private void drawSidePanels(Graphics2D g2) {
-            drawMetalPanel(g2, 125, 150, 250, 270, 28, new Color(12, 39, 52, 238));
-            drawMetalPanel(g2, 125, 475, 250, 280, 28, new Color(12, 39, 52, 238));
-
-            drawGlassWindow(g2, 150, 205, 200, 170);
-            drawGlassWindow(g2, 150, 535, 200, 175);
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 23));
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.drawString("任務官", 209, 190);
-            g2.drawString("潛水員", 209, 517);
-            g2.setColor(new Color(250, 218, 135));
-            g2.drawString("任務官", 206, 188);
-            g2.drawString("潛水員", 206, 515);
-        }
-
-        private void drawGlassWindow(Graphics2D g2, int x, int y, int w, int h) {
-            GradientPaint glassPaint = new GradientPaint(x, y, new Color(100, 220, 255, 58), x, y + h, new Color(0, 60, 90, 36));
-            g2.setPaint(glassPaint);
-            g2.fillRoundRect(x, y, w, h, 18, 18);
-            g2.setColor(new Color(255, 230, 140, 90));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(x + 1, y + 1, w - 2, h - 2, 18, 18);
-            g2.setColor(new Color(255, 255, 255, 42));
-            g2.drawLine(x + 16, y + 18, x + w - 18, y + 8);
-            g2.drawLine(x + 28, y + 42, x + w - 22, y + 25);
-        }
-
-        private void drawMissionHeader(Graphics2D g2) {
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 28));
-            g2.setColor(gold);
-            g2.drawString("可接取任務", 455, 190);
-            g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
-            g2.setColor(new Color(150, 235, 255));
-            g2.drawString("任務必須照順序接取，可連續接多個任務。", 625, 190);
-            g2.setColor(new Color(255, 210, 110, 60));
-            g2.drawLine(455, 198, 1325, 198);
-        }
-
-        private void drawBottomConsole(Graphics2D g2) {
-            int completedCount = 0;
-            for (Mission m : acceptedMissions) {
-                if (m.completed) {
-                    completedCount++;
-                }
-            }
-
-            String current = "目前任務數量：" + acceptedMissions.size() + "　完成：" + completedCount;
-            int nextIndex = acceptedMissions.size();
-            String nextText;
-            if (nextIndex < missions.size()) {
-                nextText = "下一個可接任務：" + missions.get(nextIndex).title;
-            } else {
-                nextText = "全部任務皆已接取";
-            }
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
-            g2.setColor(new Color(255, 225, 140));
-            g2.drawString(current, 455, 805);
-
-            g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 15));
-            g2.setColor(new Color(150, 225, 245));
-            g2.drawString(nextText + "　｜　ESC 可直接關閉任務大廳", 455, 828);
-        }
-
-        private void drawMissionOfficer(Graphics2D g2) {
-            int boxX = 150;
-            int boxY = 205;
-            int floatY = (int) (Math.sin(animTick * 0.07) * 3);
-            int sway = (int) (Math.sin(animTick * 0.04) * 2);
-            int x = boxX + 40 + sway;
-            int y = boxY + 18 + floatY;
-            int w = 120;
-            int h = 135;
-            g2.setColor(new Color(0, 0, 0, 110));
-            g2.fillOval(boxX + 55, boxY + 145, 90, 16);
-            g2.setColor(new Color(18, 24, 32));
-            g2.fillRoundRect(x + w / 3 - 6, y + h - 36, 22, 38, 7, 7);
-            g2.fillRoundRect(x + w / 2 + 5, y + h - 36, 22, 38, 7, 7);
-            g2.setPaint(new GradientPaint(x, y + 45, new Color(32, 45, 58), x, y + h - 20, new Color(12, 18, 28)));
-            g2.fillRoundRect(x + 26, y + 48, w - 52, 75, 18, 18);
-            g2.setColor(new Color(28, 38, 50));
-            g2.fillRoundRect(x + 8, y + 60, 25, 58, 9, 9);
-            g2.fillRoundRect(x + w - 33, y + 60, 25, 58, 9, 9);
-            g2.setColor(new Color(230, 170, 70));
-            g2.fillRect(x + 34, y + 62, w - 68, 6);
-            g2.fillRect(x + 36, y + 93, w - 72, 5);
-            g2.fillOval(x + w / 2 - 7, y + 84, 14, 14);
-            g2.setColor(new Color(218, 173, 124));
-            g2.fillOval(x + 36, y + 14, w - 72, 48);
-            g2.setColor(new Color(18, 25, 34));
-            g2.fillRoundRect(x + 30, y + 6, w - 60, 20, 12, 12);
-            g2.fillArc(x + 35, y - 2, w - 70, 38, 0, 180);
-            g2.setColor(new Color(230, 170, 70));
-            g2.drawLine(x + 36, y + 24, x + w - 36, y + 24);
-            g2.fillOval(x + w / 2 - 6, y + 8, 12, 12);
-            g2.setColor(new Color(25, 18, 12));
-            g2.fillOval(x + 48, y + 36, 5, 5);
-            g2.fillOval(x + w - 53, y + 36, 5, 5);
-            g2.drawArc(x + 50, y + 41, 20, 12, 200, 140);
-            g2.setColor(new Color(255, 220, 120, 150));
-            g2.drawOval(x + w / 2 - 16, y + 78, 32, 32);
-        }
-
-        private void drawDiver(Graphics2D g2) {
-            int boxX = 150;
-            int boxY = 535;
-            int floatY = (int) (Math.sin(animTick * 0.075) * 4);
-            int x = boxX + 36;
-            int y = boxY + 12 + floatY;
-            int w = 128;
-            int h = 145;
-            g2.setColor(new Color(0, 0, 0, 110));
-            g2.fillOval(boxX + 50, boxY + 150, 100, 17);
-            g2.setColor(new Color(42, 31, 24));
-            g2.fillRoundRect(x + w / 3 - 4, y + h - 32, 24, 36, 8, 8);
-            g2.fillRoundRect(x + w / 2 + 7, y + h - 32, 24, 36, 8, 8);
-            g2.setPaint(new GradientPaint(x, y + 50, new Color(130, 82, 45), x, y + h - 20, new Color(53, 37, 28)));
-            g2.fillRoundRect(x + 30, y + 55, w - 60, 75, 22, 22);
-            g2.setColor(new Color(220, 150, 70));
-            g2.drawRoundRect(x + 34, y + 60, w - 68, 64, 18, 18);
-            g2.drawLine(x + w / 2, y + 58, x + w / 2, y + 128);
-            g2.setColor(new Color(45, 48, 50));
-            g2.fillOval(x + 29, y + 10, w - 58, 62);
-            g2.setColor(new Color(155, 108, 62));
-            g2.setStroke(new BasicStroke(3));
-            g2.drawOval(x + 32, y + 13, w - 64, 56);
-            g2.setColor(new Color(105, 210, 245));
-            g2.fillOval(x + 48, y + 30, w - 96, 27);
-            int glow = 65 + (int) (Math.sin(animTick * 0.12) * 40);
-            g2.setColor(new Color(115, 225, 255, Math.max(30, Math.min(115, glow))));
-            g2.fillOval(x + 39, y + 22, w - 78, 43);
-            g2.setColor(new Color(65, 45, 32));
-            g2.fillRoundRect(x + 8, y + 70, 28, 55, 10, 10);
-            g2.fillRoundRect(x + w - 36, y + 70, 28, 55, 10, 10);
-        }
-
-        private void drawScrollIndicator(Graphics2D g2) {
-            int x = 1342;
-            int y = 222;
-            int h = 470;
-            g2.setColor(new Color(38, 96, 125, 165));
-            g2.fillRoundRect(x, y, 9, h, 9, 9);
-            int max = scrollPane.getVerticalScrollBar().getMaximum();
-            int value = scrollPane.getVerticalScrollBar().getValue();
-            int knobY = y;
-            if (max > 0) {
-                knobY = y + (int) ((h - 90) * (value / (double) max));
-            }
-            g2.setColor(new Color(178, 236, 255, 215));
-            g2.fillRoundRect(x - 4, knobY, 17, 90, 12, 12);
-            g2.setColor(new Color(255, 220, 110, 110));
-            g2.drawLine(x + 4, y - 20, x + 4, y - 6);
-            g2.drawLine(x + 4, y + h + 6, x + 4, y + h + 20);
-        }
-
-        private void drawCornerDecorations(Graphics2D g2) {
-            g2.setStroke(new BasicStroke(4));
-            g2.setColor(new Color(255, 215, 120, 80));
-            int[][] corners = {{108, 118}, {1458, 118}, {108, 796}, {1458, 796}};
-            for (int[] c : corners) {
-                g2.drawLine(c[0], c[1], c[0] + 34, c[1]);
-                g2.drawLine(c[0], c[1], c[0], c[1] + 34);
-            }
-        }
-
-        private void drawVignette(Graphics2D g2) {
-            g2.setColor(new Color(0, 0, 0, 95));
-            g2.fillRect(0, 0, PANEL_WIDTH, 18);
-            g2.fillRect(0, PANEL_HEIGHT - 18, PANEL_WIDTH, 18);
-            g2.fillRect(0, 0, 18, PANEL_HEIGHT);
-            g2.fillRect(PANEL_WIDTH - 18, 0, 18, PANEL_HEIGHT);
-        }
-
-        private void drawMetalPanel(Graphics2D g2, int x, int y, int w, int h, int arc, Color fill) {
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.fillRoundRect(x + 8, y + 8, w, h, arc, arc);
-            g2.setPaint(new GradientPaint(x, y, fill.brighter(), x, y + h, fill.darker()));
-            g2.fillRoundRect(x, y, w, h, arc, arc);
-            g2.setColor(copper);
-            g2.setStroke(new BasicStroke(3));
-            g2.drawRoundRect(x + 2, y + 2, w - 4, h - 4, arc, arc);
-            g2.setColor(new Color(255, 255, 255, 35));
-            g2.drawRoundRect(x + 10, y + 10, w - 20, h - 20, Math.max(8, arc - 6), Math.max(8, arc - 6));
-        }
-
-        private void drawBolt(Graphics2D g2, int x, int y, int r) {
-            g2.setColor(new Color(35, 20, 8, 180));
-            g2.fillOval(x - r, y - r, r * 2, r * 2);
-            g2.setColor(new Color(220, 160, 60));
-            g2.setStroke(new BasicStroke(3));
-            g2.drawOval(x - r, y - r, r * 2, r * 2);
-            g2.drawLine(x - r / 2, y, x + r / 2, y);
-            g2.drawLine(x, y - r / 2, x, y + r / 2);
-        }
-
-        class MissionCard extends JPanel {
-            private Mission mission;
-            private boolean hover = false;
-
-            public MissionCard(Mission mission) {
-                this.mission = mission;
-                setOpaque(false);
-                setPreferredSize(new Dimension(815, 112));
-                setMaximumSize(new Dimension(815, 112));
-                setLayout(new BorderLayout());
-                setBorder(new EmptyBorder(10, 12, 10, 12));
-                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-                JLabel icon = new JLabel(getIconForMission(mission), SwingConstants.CENTER);
-                icon.setPreferredSize(new Dimension(70, 85));
-                icon.setFont(new Font("Microsoft JhengHei", Font.BOLD, 30));
-                icon.setForeground(new Color(245, 195, 90));
-
-                JPanel textPanel = new JPanel();
-                textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-                textPanel.setOpaque(false);
-                textPanel.setBorder(new EmptyBorder(4, 8, 4, 8));
-
-                JLabel title = new JLabel(mission.title + "　[" + mission.category + "]");
-                title.setFont(new Font("Microsoft JhengHei", Font.BOLD, 23));
-                title.setForeground(new Color(255, 220, 125));
-
-                JLabel desc = new JLabel("<html><body style='width:555px'>" + mission.description + "</body></html>");
-                desc.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 15));
-                desc.setForeground(new Color(225, 235, 235));
-
-                JLabel reward = new JLabel("獎勵：" + mission.reward);
-                reward.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
-                reward.setForeground(new Color(105, 230, 255));
-
-                textPanel.add(title);
-                textPanel.add(Box.createVerticalStrut(5));
-                textPanel.add(desc);
-                textPanel.add(Box.createVerticalStrut(5));
-                textPanel.add(reward);
-
-                JLabel status = new JLabel(getMissionStatusText(mission), SwingConstants.CENTER);
-                status.setPreferredSize(new Dimension(90, 85));
-                status.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
-                status.setForeground(new Color(230, 190, 95));
-
-                add(icon, BorderLayout.WEST);
-                add(textPanel, BorderLayout.CENTER);
-                add(status, BorderLayout.EAST);
-
-                addMouseListener(new MouseAdapter() {
-                    @Override
-                    public void mouseClicked(MouseEvent e) {
-                        selectMission(mission);
-                    }
-
-                    @Override
-                    public void mouseEntered(MouseEvent e) {
-                        hover = true;
-                        repaint();
-                    }
-
-                    @Override
-                    public void mouseExited(MouseEvent e) {
-                        hover = false;
-                        repaint();
-                    }
-                });
-            }
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                boolean selected = mission == selectedMission;
-                boolean accepted = isAccepted(mission);
-                boolean next = isNextMission(mission);
-
-                Color top;
-                Color bottom;
-                Color border;
-
-                if (isCompleted(mission)) {
-                    top = new Color(80, 105, 45, 235);
-                    bottom = new Color(35, 65, 28, 235);
-                    border = new Color(255, 225, 120);
-                } else if (accepted) {
-                    top = new Color(35, 92, 65, 232);
-                    bottom = new Color(12, 50, 35, 232);
-                    border = new Color(125, 235, 150);
-                } else if (selected) {
-                    top = new Color(34, 112, 140, 242);
-                    bottom = new Color(12, 50, 78, 242);
-                    border = new Color(255, 214, 95);
-                } else if (next) {
-                    top = new Color(14, 52, 72, 230);
-                    bottom = new Color(6, 28, 44, 230);
-                    border = new Color(210, 160, 70);
-                } else if (hover) {
-                    top = new Color(18, 68, 90, 234);
-                    bottom = new Color(8, 38, 55, 234);
-                    border = new Color(150, 120, 70);
-                } else {
-                    top = new Color(8, 30, 42, 170);
-                    bottom = new Color(4, 14, 22, 170);
-                    border = new Color(80, 70, 52);
-                }
-
-                g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 18, 18);
-                g2.setColor(border);
-                g2.setStroke(new BasicStroke(selected ? 4 : 2));
-                g2.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 18, 18);
-
-                if (selected || next) {
-                    g2.setColor(new Color(255, 220, 90, selected ? 48 : 26));
-                    g2.fillRoundRect(8, 8, getWidth() - 16, getHeight() - 16, 14, 14);
-                }
-
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        }
-
-        class GameButton extends JButton {
-            public GameButton(String text) {
-                super(text);
-                setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
-                setForeground(new Color(255, 235, 170));
-                setFocusPainted(false);
-                setContentAreaFilled(false);
-                setOpaque(false);
-                setBorder(BorderFactory.createEmptyBorder());
-                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            }
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                ButtonModel model = getModel();
-                Color top = model.isPressed() ? new Color(13, 55, 70) : new Color(24, 94, 116);
-                Color bottom = model.isPressed() ? new Color(7, 28, 40) : new Color(10, 50, 70);
-                g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
-                g2.setColor(new Color(235, 185, 75));
-                g2.setStroke(new BasicStroke(3));
-                g2.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 16, 16);
-                if (model.isRollover()) {
-                    g2.setColor(new Color(255, 230, 120, 50));
-                    g2.fillRoundRect(5, 5, getWidth() - 10, getHeight() - 10, 12, 12);
-                }
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        }
-
-        private String getMissionStatusText(Mission mission) {
-            if (isCompleted(mission)) {
-                return "完成";
-            }
-            if (isAccepted(mission)) {
-                return "已接";
-            }
-            if (isNextMission(mission)) {
-                return "可接";
-            }
-            return "鎖定";
-        }
-
-        private String getIconForMission(Mission mission) {
-            if (mission.category.equals("戰鬥")) return "⚔";
-            if (mission.category.equals("探索")) return "⌖";
-            if (mission.category.equals("收集")) return "◆";
-            if (mission.category.equals("回收")) return "▣";
-            return "⚓";
-        }
-    }
-
     public static class Mission {
-        int order;
-        String title;
-        String description;
-        String reward;
-        String type;
-        int targetAmount;
-        int currentAmount;
-        boolean completed;
-        String category;
+        public String id;
+        public String title;
+        public String description;
+        public int reward;
+        public int targetAmount;
+        public int currentAmount;
+        public boolean completed;
+        public boolean rewardGiven;
 
-        public Mission(int order, String title, String description, String reward, String type, int targetAmount, String category) {
-            this.order = order;
+        public Mission(String title, String description, int reward, int targetAmount) {
+            this(inferMissionId(title), title, description, reward, targetAmount);
+        }
+
+        public Mission(String id, String title, String description, int reward, int targetAmount) {
+            this.id = normalizeMissionId(id, title);
             this.title = title;
             this.description = description;
             this.reward = reward;
-            this.type = type;
             this.targetAmount = targetAmount;
             this.currentAmount = 0;
             this.completed = false;
-            this.category = category;
+            this.rewardGiven = false;
         }
+    }
+
+    private static final List<Mission> acceptedMissions = new ArrayList<>();
+    private static Mission acceptedMission = null;
+
+    private static int deepestDepthReached = 0;
+    private static int defeatedGreenEelCount = 0;
+    private static int safeReturnCount = 0;
+    private static int exploredDeepBaseCount = 0;
+
+    private static String lastCompleteMessage = "";
+    private static long lastCompleteMessageTime = 0;
+
+    private List<Mission> missionList = new ArrayList<>();
+
+    private JPanel missionListPanel;
+    private JComboBox<String> statusFilterBox;
+    private JLabel detailTitleLabel;
+    private JTextArea detailDescriptionArea;
+    private JLabel detailRewardLabel;
+    private JLabel detailProgressLabel;
+    private JProgressBar progressBar;
+    private JButton acceptButton;
+    private JButton refreshButton;
+    private JButton acceptNextButton;
+
+    private int selectedMissionIndex = 0;
+
+    public MissionBoardView() {
+        setTitle("Mission Board - 任務公告板");
+        setSize(1100, 740);
+        setLocationRelativeTo(null);
+        setResizable(false);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        getRootPane().registerKeyboardAction(
+            e -> dispose(),
+            KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+            JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
+
+        missionList.addAll(createDefaultMissionList());
+        buildUI();
+
+        setVisible(true);
+    }
+
+    public static List<Mission> createDefaultMissionList() {
+        List<Mission> list = new ArrayList<>();
+
+        list.add(new Mission("CATCH_SARDINE", "捕捉沙丁魚", "前往淺海區捕捉 3 隻沙丁魚，作為新手潛水員的基礎訓練。", 800, 3));
+        list.add(new Mission("REACH_DEPTH_500", "下潛到 500m", "進入海洋地圖並成功下潛到 500m 深度，確認潛水衣運作狀態。", 1200, 500));
+        list.add(new Mission("CATCH_CLOWNFISH", "帶回小丑魚", "捕捉並帶回 1 隻小丑魚，交給水族館進行觀察。", 1500, 1));
+        list.add(new Mission("DEFEAT_GREEN_EEL", "擊倒綠鰻魚", "深海區出現具有攻擊性的綠鰻魚，請擊倒 1 隻並安全回收。", 2500, 1));
+        list.add(new Mission("COLLECT_5_SPECIES", "收集五種生物", "完成一次探索，捕捉並帶回 5 種不同海洋生物。", 3000, 5));
+        list.add(new Mission("EXPLORE_DEEP_BASE", "探索深海基地", "下潛至深海基地附近，完成區域偵查後安全返回。", 3500, 1));
+        list.add(new Mission("RETURN_VALUE_3000", "高價魚獲回收", "單次下潛帶回總價值 3000 以上的魚獲。", 2200, 3000));
+        list.add(new Mission("SAFE_RETURN", "安全返航訓練", "完成一次下潛任務，並成功回到陸地基地。", 1000, 1));
+
+        return list;
+    }
+
+    private void buildUI() {
+        JPanel root = new JPanel(new BorderLayout(16, 16));
+        root.setBackground(new Color(14, 24, 34));
+        root.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
+
+        JPanel titlePanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        titlePanel.setOpaque(false);
+
+        JLabel titleLabel = new JLabel("MISSION BOARD 任務公告板", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 34));
+        titleLabel.setForeground(new Color(255, 220, 130));
+
+        JLabel subtitleLabel = new JLabel("任務照順序接取，完成後自動發放金幣獎勵", SwingConstants.CENTER);
+        subtitleLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
+        subtitleLabel.setForeground(new Color(190, 225, 230));
+
+        titlePanel.add(titleLabel);
+        titlePanel.add(subtitleLabel);
+        root.add(titlePanel, BorderLayout.NORTH);
+
+        JPanel leftPanel = new JPanel(new BorderLayout(0, 12));
+        leftPanel.setOpaque(false);
+
+        JPanel filterPanel = new JPanel(new BorderLayout(10, 0));
+        filterPanel.setOpaque(false);
+
+        JLabel filterLabel = new JLabel("顯示");
+        filterLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+        filterLabel.setForeground(new Color(255, 235, 170));
+
+        statusFilterBox = new JComboBox<>(new String[] {
+            "全部任務",
+            "可接取",
+            "進行中",
+            "已完成",
+            "未解鎖"
+        });
+        statusFilterBox.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        statusFilterBox.addActionListener(e -> {
+            refreshMissionCards();
+            updateDetailPanel();
+        });
+
+        filterPanel.add(filterLabel, BorderLayout.WEST);
+        filterPanel.add(statusFilterBox, BorderLayout.CENTER);
+
+        missionListPanel = new JPanel();
+        missionListPanel.setLayout(new BoxLayout(missionListPanel, BoxLayout.Y_AXIS));
+        missionListPanel.setBackground(new Color(25, 38, 50));
+
+        JScrollPane scrollPane = new JScrollPane(missionListPanel);
+        scrollPane.setPreferredSize(new Dimension(540, 580));
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(210, 145, 58), 3));
+        scrollPane.getViewport().setBackground(new Color(25, 38, 50));
+
+        leftPanel.add(filterPanel, BorderLayout.NORTH);
+        leftPanel.add(scrollPane, BorderLayout.CENTER);
+
+        root.add(leftPanel, BorderLayout.WEST);
+
+        JPanel detailPanel = new JPanel(new BorderLayout(12, 12));
+        detailPanel.setBackground(new Color(22, 42, 56));
+        detailPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(210, 145, 58), 3),
+            BorderFactory.createEmptyBorder(18, 18, 18, 18)
+        ));
+
+        detailTitleLabel = new JLabel();
+        detailTitleLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 27));
+        detailTitleLabel.setForeground(new Color(255, 225, 140));
+
+        detailDescriptionArea = new JTextArea();
+        detailDescriptionArea.setEditable(false);
+        detailDescriptionArea.setLineWrap(true);
+        detailDescriptionArea.setWrapStyleWord(true);
+        detailDescriptionArea.setOpaque(false);
+        detailDescriptionArea.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 18));
+        detailDescriptionArea.setForeground(new Color(225, 240, 240));
+
+        detailRewardLabel = new JLabel();
+        detailRewardLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
+        detailRewardLabel.setForeground(new Color(110, 230, 255));
+
+        detailProgressLabel = new JLabel();
+        detailProgressLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+        detailProgressLabel.setForeground(new Color(200, 235, 235));
+
+        progressBar = new JProgressBar(0, 100);
+        progressBar.setStringPainted(true);
+        progressBar.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
+        progressBar.setForeground(new Color(70, 190, 120));
+        progressBar.setBackground(new Color(10, 24, 32));
+
+        JPanel detailTextPanel = new JPanel(new GridLayout(3, 1, 0, 10));
+        detailTextPanel.setOpaque(false);
+        detailTextPanel.add(detailRewardLabel);
+        detailTextPanel.add(detailProgressLabel);
+        detailTextPanel.add(progressBar);
+
+        acceptButton = createButton("接取任務");
+        acceptNextButton = createButton("接下一個可接任務");
+        refreshButton = createButton("刷新進度");
+        JButton closeButton = createButton("關閉");
+
+        acceptButton.setToolTipText("接取目前選取的任務");
+        acceptNextButton.setToolTipText("自動接取清單中下一個可接任務");
+        refreshButton.setToolTipText("重新掃描背包、儲藏箱和海洋狀態");
+
+        acceptButton.addActionListener(e -> acceptSelectedMission());
+        acceptNextButton.addActionListener(e -> acceptNextAvailableMission());
+        refreshButton.addActionListener(e -> {
+            autoCheckMissionProgress();
+            refreshMissionCards();
+            updateDetailPanel();
+        });
+        closeButton.addActionListener(e -> dispose());
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 2, 12, 12));
+        buttonPanel.setOpaque(false);
+        buttonPanel.add(acceptButton);
+        buttonPanel.add(acceptNextButton);
+        buttonPanel.add(refreshButton);
+        buttonPanel.add(closeButton);
+
+        detailPanel.add(detailTitleLabel, BorderLayout.NORTH);
+        detailPanel.add(detailDescriptionArea, BorderLayout.CENTER);
+        detailPanel.add(detailTextPanel, BorderLayout.SOUTH);
+
+        JPanel rightPanel = new JPanel(new BorderLayout(0, 14));
+        rightPanel.setOpaque(false);
+        rightPanel.add(detailPanel, BorderLayout.CENTER);
+        rightPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        root.add(rightPanel, BorderLayout.CENTER);
+
+        add(root);
+
+        autoCheckMissionProgress();
+        refreshMissionCards();
+        updateDetailPanel();
+    }
+
+    private JButton createButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Microsoft JhengHei", Font.BOLD, 19));
+        button.setFocusPainted(false);
+        button.setBackground(new Color(18, 80, 105));
+        button.setForeground(new Color(255, 235, 170));
+        button.setBorder(BorderFactory.createLineBorder(new Color(210, 145, 58), 3));
+        return button;
+    }
+
+    private void refreshMissionCards() {
+        ensureSelectedMissionVisible();
+        missionListPanel.removeAll();
+
+        boolean hasAny = false;
+
+        for (int i = 0; i < missionList.size(); i++) {
+            if (!shouldShowMission(i)) {
+                continue;
+            }
+
+            hasAny = true;
+            missionListPanel.add(createMissionCard(missionList.get(i), i));
+            missionListPanel.add(Box.createVerticalStrut(12));
+        }
+
+        if (!hasAny) {
+            JLabel emptyLabel = new JLabel("目前沒有符合篩選條件的任務", SwingConstants.CENTER);
+            emptyLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
+            emptyLabel.setForeground(new Color(255, 235, 170));
+            emptyLabel.setPreferredSize(new Dimension(500, 120));
+            missionListPanel.add(emptyLabel);
+        }
+
+        missionListPanel.revalidate();
+        missionListPanel.repaint();
+    }
+
+    private void ensureSelectedMissionVisible() {
+        if (missionList.isEmpty()) {
+            selectedMissionIndex = 0;
+            return;
+        }
+
+        if (selectedMissionIndex >= 0 && selectedMissionIndex < missionList.size() && shouldShowMission(selectedMissionIndex)) {
+            return;
+        }
+
+        for (int i = 0; i < missionList.size(); i++) {
+            if (shouldShowMission(i)) {
+                selectedMissionIndex = i;
+                return;
+            }
+        }
+
+        selectedMissionIndex = 0;
+    }
+
+    private boolean shouldShowMission(int index) {
+        String filter = statusFilterBox == null ? "全部任務" : (String) statusFilterBox.getSelectedItem();
+
+        if (filter == null || filter.equals("全部任務")) {
+            return true;
+        }
+
+        Mission baseMission = missionList.get(index);
+        Mission acceptedVersion = findAcceptedMissionByTitle(baseMission.title);
+        Mission mission = acceptedVersion == null ? baseMission : acceptedVersion;
+
+        if (filter.equals("可接取")) {
+            return acceptedVersion == null && canAcceptMission(index);
+        }
+
+        if (filter.equals("進行中")) {
+            return acceptedVersion != null && !mission.completed;
+        }
+
+        if (filter.equals("已完成")) {
+            return acceptedVersion != null && mission.completed;
+        }
+
+        if (filter.equals("未解鎖")) {
+            return acceptedVersion == null && !canAcceptMission(index);
+        }
+
+        return true;
+    }
+
+    private JPanel createMissionCard(Mission baseMission, int index) {
+        Mission acceptedVersion = findAcceptedMissionByTitle(baseMission.title);
+        Mission mission = acceptedVersion == null ? baseMission : acceptedVersion;
+
+        boolean selected = index == selectedMissionIndex;
+        boolean accepted = acceptedVersion != null;
+
+        JPanel card = new JPanel(new BorderLayout(10, 6));
+        card.setPreferredSize(new Dimension(500, 105));
+        card.setMaximumSize(new Dimension(500, 105));
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(selected ? new Color(255, 225, 120) : new Color(130, 95, 45), selected ? 4 : 2),
+            BorderFactory.createEmptyBorder(10, 14, 10, 14)
+        ));
+        card.setBackground(selected ? new Color(35, 90, 110) : new Color(235, 220, 185));
+
+        JLabel title = new JLabel(getMissionNumber(index) + ". " + mission.title);
+        title.setFont(new Font("Microsoft JhengHei", Font.BOLD, 19));
+        title.setForeground(selected ? new Color(255, 235, 170) : new Color(45, 35, 25));
+
+        JLabel desc = new JLabel("獎勵 $" + mission.reward + "｜進度 " + mission.currentAmount + " / " + mission.targetAmount);
+        desc.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+        desc.setForeground(selected ? new Color(220, 240, 245) : new Color(70, 60, 45));
+
+        int percent = getPercent(mission);
+        JProgressBar smallBar = new JProgressBar(0, 100);
+        smallBar.setValue(percent);
+        smallBar.setStringPainted(true);
+        smallBar.setString(percent + "%");
+        smallBar.setFont(new Font("Microsoft JhengHei", Font.BOLD, 12));
+        smallBar.setForeground(new Color(70, 180, 120));
+        smallBar.setBackground(selected ? new Color(15, 45, 60) : new Color(210, 195, 160));
+
+        JLabel status = new JLabel();
+        status.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
+
+        if (accepted && mission.completed) {
+            status.setText("已完成");
+            status.setForeground(new Color(90, 230, 120));
+        } else if (accepted) {
+            status.setText("進行中");
+            status.setForeground(new Color(90, 210, 255));
+        } else if (!canAcceptMission(index)) {
+            status.setText("未解鎖");
+            status.setForeground(selected ? new Color(255, 180, 120) : new Color(130, 80, 40));
+        } else {
+            status.setText("可接取");
+            status.setForeground(selected ? new Color(255, 225, 120) : new Color(120, 80, 35));
+        }
+
+        JPanel textPanel = new JPanel(new GridLayout(3, 1, 0, 3));
+        textPanel.setOpaque(false);
+        textPanel.add(title);
+        textPanel.add(desc);
+        textPanel.add(smallBar);
+
+        card.add(textPanel, BorderLayout.CENTER);
+        card.add(status, BorderLayout.EAST);
+
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        card.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                selectedMissionIndex = index;
+                autoCheckMissionProgress();
+                updateDetailPanel();
+                refreshMissionCards();
+            }
+        });
+
+        return card;
+    }
+
+    private String getMissionNumber(int index) {
+        return String.format("%02d", index + 1);
+    }
+
+    private int getPercent(Mission mission) {
+        if (mission.targetAmount <= 0) {
+            return 0;
+        }
+
+        int percent = (int) Math.round(mission.currentAmount * 100.0 / mission.targetAmount);
+
+        if (percent < 0) {
+            return 0;
+        }
+
+        if (percent > 100) {
+            return 100;
+        }
+
+        return percent;
+    }
+
+    private void updateDetailPanel() {
+        ensureSelectedMissionVisible();
+
+        if (missionList.isEmpty() || !shouldShowMission(selectedMissionIndex)) {
+            detailTitleLabel.setText("沒有符合條件的任務");
+            detailDescriptionArea.setText("目前篩選條件下沒有任務可以顯示。");
+            detailRewardLabel.setText("任務獎勵：--");
+            detailProgressLabel.setText("目前進度：--");
+            progressBar.setValue(0);
+            progressBar.setString("0%");
+            acceptButton.setEnabled(false);
+            return;
+        }
+
+        Mission baseMission = missionList.get(selectedMissionIndex);
+        Mission acceptedVersion = findAcceptedMissionByTitle(baseMission.title);
+        Mission mission = acceptedVersion == null ? baseMission : acceptedVersion;
+
+        detailTitleLabel.setText(getMissionNumber(selectedMissionIndex) + ". " + mission.title);
+        detailDescriptionArea.setText(
+            mission.description + "\n\n" +
+            "狀態：" + getMissionStatusText(mission, selectedMissionIndex, acceptedVersion != null) + "\n\n" +
+            "說明：任務進度會自動從背包、儲藏箱和海洋場景狀態更新。"
+        );
+
+        detailRewardLabel.setText("任務獎勵：$" + mission.reward);
+        detailProgressLabel.setText("目前進度：" + mission.currentAmount + " / " + mission.targetAmount);
+        progressBar.setValue(getPercent(mission));
+        progressBar.setString(getPercent(mission) + "%");
+
+        if (acceptedVersion != null && acceptedVersion.completed) {
+            acceptButton.setText("已完成");
+            acceptButton.setEnabled(false);
+        } else if (acceptedVersion != null) {
+            acceptButton.setText("進行中");
+            acceptButton.setEnabled(false);
+        } else if (!canAcceptMission(selectedMissionIndex)) {
+            acceptButton.setText("請先接前面的任務");
+            acceptButton.setEnabled(false);
+        } else {
+            acceptButton.setText("接取任務");
+            acceptButton.setEnabled(true);
+        }
+    }
+
+    private String getMissionStatusText(Mission mission, int index, boolean accepted) {
+        if (accepted && mission.completed) {
+            return "已完成，獎勵已發放";
+        }
+
+        if (accepted) {
+            return "進行中";
+        }
+
+        if (!canAcceptMission(index)) {
+            return "尚未解鎖，請先接取前一個任務";
+        }
+
+        return "可接取";
+    }
+
+    private boolean canAcceptMission(int index) {
+        if (index == 0) {
+            return true;
+        }
+
+        return isMissionAccepted(missionList.get(index - 1).title);
+    }
+
+    private void acceptNextAvailableMission() {
+        for (int i = 0; i < missionList.size(); i++) {
+            Mission mission = missionList.get(i);
+
+            if (findAcceptedMissionByTitle(mission.title) == null && canAcceptMission(i)) {
+                selectedMissionIndex = i;
+                acceptSelectedMission();
+                return;
+            }
+        }
+
+        JOptionPane.showMessageDialog(
+            this,
+            "目前沒有可以接取的新任務。",
+            "沒有新任務",
+            JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    private void acceptSelectedMission() {
+        Mission selectedMission = missionList.get(selectedMissionIndex);
+
+        if (isMissionAccepted(selectedMission.title)) {
+            JOptionPane.showMessageDialog(this, "你已經接取過這個任務了。", "任務已存在", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        if (!canAcceptMission(selectedMissionIndex)) {
+            JOptionPane.showMessageDialog(this, "任務需要照順序接取，請先接前一個任務。", "無法接取", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        Mission accepted = new Mission(selectedMission.id, selectedMission.title, selectedMission.description, selectedMission.reward, selectedMission.targetAmount);
+        acceptedMissions.add(accepted);
+        acceptedMission = accepted;
+
+        autoCheckMissionProgress();
+
+        JOptionPane.showMessageDialog(this, "已接取任務：\n" + accepted.title + "\n\n" + accepted.description, "任務接取成功", JOptionPane.INFORMATION_MESSAGE);
+
+        refreshMissionCards();
+        updateDetailPanel();
+    }
+
+    public static List<Mission> getAcceptedMissions() {
+        autoCheckMissionProgress();
+        return acceptedMissions;
+    }
+
+    public static Mission getAcceptedMission() {
+        autoCheckMissionProgress();
+
+        if (acceptedMission != null) {
+            return acceptedMission;
+        }
+
+        if (!acceptedMissions.isEmpty()) {
+            return acceptedMissions.get(acceptedMissions.size() - 1);
+        }
+
+        return null;
+    }
+
+    public static String getAcceptedMissionTitle() {
+        Mission current = getAcceptedMission();
+        return current == null ? "無" : current.title;
+    }
+
+    public static boolean isMissionAccepted(String title) {
+        return findAcceptedMissionByTitle(title) != null;
+    }
+
+    public static boolean isMissionIdAccepted(String id) {
+        return findAcceptedMissionById(id) != null;
+    }
+
+    public static void acceptMissionFromOutside(Mission mission) {
+        if (mission == null) {
+            return;
+        }
+
+        mission.id = normalizeMissionId(mission.id, mission.title);
+
+        if (isMissionAccepted(mission.title)) {
+            return;
+        }
+
+        acceptedMissions.add(mission);
+        acceptedMission = mission;
+        autoCheckMissionProgress();
+    }
+
+    public static void updateMissionProgress(String keyword, int amount) {
+        if (keyword == null) {
+            return;
+        }
+
+        for (Mission mission : acceptedMissions) {
+            if (mission.completed) {
+                continue;
+            }
+
+            boolean matched =
+                (mission.id != null && mission.id.contains(keyword))
+                || (mission.title != null && mission.title.contains(keyword))
+                || (mission.description != null && mission.description.contains(keyword));
+
+            if (!matched) {
+                continue;
+            }
+
+            mission.currentAmount += amount;
+            limitMissionProgress(mission);
+
+            if (mission.currentAmount >= mission.targetAmount) {
+                completeMission(mission);
+            }
+        }
+    }
+
+    public static void updateMissionProgressById(String id, int amount) {
+        Mission mission = findAcceptedMissionById(id);
+
+        if (mission == null || mission.completed) {
+            return;
+        }
+
+        mission.currentAmount += amount;
+        limitMissionProgress(mission);
+
+        if (mission.currentAmount >= mission.targetAmount) {
+            completeMission(mission);
+        }
+    }
+
+    public static void registerCatchFish(Fish fish) {
+        autoCheckMissionProgress();
+    }
+
+    public static void registerReachDepth(int depth) {
+        if (depth > deepestDepthReached) {
+            deepestDepthReached = depth;
+        }
+
+        if (depth >= 1200) {
+            exploredDeepBaseCount = Math.max(exploredDeepBaseCount, 1);
+        }
+
+        autoCheckMissionProgress();
+    }
+
+    public static void registerDefeatEnemy(String enemyName) {
+        if (enemyName == null) {
+            return;
+        }
+
+        if (enemyName.contains("綠") || enemyName.contains("青魚") || enemyName.contains("鰻") || enemyName.toLowerCase().contains("eel")) {
+            defeatedGreenEelCount++;
+        }
+
+        autoCheckMissionProgress();
+    }
+
+    public static void registerSafeReturn() {
+        safeReturnCount++;
+        autoCheckMissionProgress();
+    }
+
+    public static void registerExploreDeepBase() {
+        exploredDeepBaseCount = Math.max(exploredDeepBaseCount, 1);
+        autoCheckMissionProgress();
+    }
+
+    public static String getLastCompleteMessage() {
+        if (System.currentTimeMillis() - lastCompleteMessageTime > 5000) {
+            return "";
+        }
+
+        return lastCompleteMessage;
+    }
+
+    public static void autoCheckMissionProgress() {
+        if (acceptedMissions.isEmpty()) {
+            return;
+        }
+
+        scanOceanWorldRuntimeState();
+
+        List<Fish> allFish = getAllPlayerFishSafely();
+
+        int sardineCount = countFishByName(allFish, "沙丁");
+        int clownCount = countFishByName(allFish, "小丑");
+        int greenEelLikeCount = countFishByName(allFish, "綠") + countFishByName(allFish, "青魚") + countFishByName(allFish, "鰻");
+        int rareCount = countRareFish(allFish, 3);
+        int speciesCount = countSpecies(allFish);
+        int totalFishValue = totalFishValue(allFish);
+
+        if (getStorageFishCountSafely() > 0) {
+            safeReturnCount = Math.max(safeReturnCount, 1);
+        }
+
+        for (Mission mission : acceptedMissions) {
+            if (mission.completed) {
+                continue;
+            }
+
+            String id = normalizeMissionId(mission.id, mission.title);
+
+            if (id.equals("CATCH_SARDINE")) {
+                mission.currentAmount = Math.max(mission.currentAmount, sardineCount);
+            } else if (id.equals("REACH_DEPTH_500")) {
+                mission.currentAmount = Math.max(mission.currentAmount, deepestDepthReached);
+            } else if (id.equals("CATCH_CLOWNFISH")) {
+                mission.currentAmount = Math.max(mission.currentAmount, clownCount);
+            } else if (id.equals("DEFEAT_GREEN_EEL")) {
+                mission.currentAmount = Math.max(mission.currentAmount, Math.max(defeatedGreenEelCount, greenEelLikeCount));
+            } else if (id.equals("COLLECT_5_SPECIES") || id.equals("COLLECT_FIVE_SPECIES")) {
+                mission.currentAmount = Math.max(mission.currentAmount, speciesCount);
+            } else if (id.equals("EXPLORE_DEEP_BASE")) {
+                int progress = exploredDeepBaseCount;
+                if (deepestDepthReached >= 1200) {
+                    progress = 1;
+                }
+                mission.currentAmount = Math.max(mission.currentAmount, progress);
+            } else if (id.equals("RETURN_VALUE_3000")) {
+                mission.currentAmount = Math.max(mission.currentAmount, totalFishValue);
+            } else if (id.equals("SAFE_RETURN")) {
+                mission.currentAmount = Math.max(mission.currentAmount, safeReturnCount);
+            }
+
+            limitMissionProgress(mission);
+
+            if (mission.currentAmount >= mission.targetAmount) {
+                completeMission(mission);
+            }
+        }
+    }
+
+    private static void scanOceanWorldRuntimeState() {
+        try {
+            for (Window w : Window.getWindows()) {
+                scanComponentForOceanWorld(w);
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    private static void scanComponentForOceanWorld(Component c) {
+        if (c == null) {
+            return;
+        }
+
+        if (c.getClass().getSimpleName().equals("OceanWorld")) {
+            Double playerYValue = readDoubleField(c, "playerY");
+            if (playerYValue != null) {
+                int depth = Math.max(0, (int) Math.round(playerYValue - 300));
+                if (depth > deepestDepthReached) {
+                    deepestDepthReached = depth;
+                }
+
+                if (depth >= 1200) {
+                    exploredDeepBaseCount = Math.max(exploredDeepBaseCount, 1);
+                }
+            }
+
+            Object fishListObj = readField(c, "fishList");
+            if (fishListObj instanceof Iterable) {
+                for (Object fishObj : (Iterable<?>) fishListObj) {
+                    Boolean dead = readBooleanField(fishObj, "dead");
+                    String name = readStringField(fishObj, "name");
+
+                    if (Boolean.TRUE.equals(dead) && name != null) {
+                        if (name.contains("綠") || name.contains("青魚") || name.contains("鰻") || name.toLowerCase().contains("eel")) {
+                            defeatedGreenEelCount = Math.max(defeatedGreenEelCount, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (c instanceof Container) {
+            Component[] children = ((Container) c).getComponents();
+            for (Component child : children) {
+                scanComponentForOceanWorld(child);
+            }
+        }
+    }
+
+    private static Object readField(Object target, String fieldName) {
+        try {
+            if (target == null) {
+                return null;
+            }
+
+            Field field = findField(target.getClass(), fieldName);
+            if (field == null) {
+                return null;
+            }
+
+            field.setAccessible(true);
+            return field.get(target);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Double readDoubleField(Object target, String fieldName) {
+        Object value = readField(target, fieldName);
+        return value instanceof Number ? ((Number) value).doubleValue() : null;
+    }
+
+    private static Boolean readBooleanField(Object target, String fieldName) {
+        Object value = readField(target, fieldName);
+        return value instanceof Boolean ? (Boolean) value : null;
+    }
+
+    private static String readStringField(Object target, String fieldName) {
+        Object value = readField(target, fieldName);
+        return value == null ? null : value.toString();
+    }
+
+    private static Field findField(Class<?> cls, String fieldName) {
+        Class<?> current = cls;
+
+        while (current != null) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException e) {
+                current = current.getSuperclass();
+            }
+        }
+
+        return null;
+    }
+
+    private static List<Fish> getAllPlayerFishSafely() {
+        List<Fish> result = new ArrayList<>();
+
+        addFishListFromInventoryMethod(result, "getMyBackpack");
+        addFishListFromInventoryMethod(result, "getStorage");
+        addFishListFromInventoryMethod(result, "getCurrentDiveList");
+        addFishListFromInventoryMethod(result, "getCurrentDiveFishList");
+        addFishListFromInventoryMethod(result, "getStorageList");
+        addFishListFromInventoryMethod(result, "getPermanentStorageList");
+
+        return result;
+    }
+
+    private static int getStorageFishCountSafely() {
+        List<Fish> storage = new ArrayList<>();
+        addFishListFromInventoryMethod(storage, "getStorage");
+        addFishListFromInventoryMethod(storage, "getStorageList");
+        addFishListFromInventoryMethod(storage, "getPermanentStorageList");
+        return storage.size();
+    }
+
+    private static void addFishListFromInventoryMethod(List<Fish> result, String methodName) {
+        try {
+            Method method = InventoryManager.class.getMethod(methodName);
+            Object value = method.invoke(null);
+
+            if (value instanceof Iterable) {
+                for (Object item : (Iterable<?>) value) {
+                    if (item instanceof Fish) {
+                        result.add((Fish) item);
+                    }
+                }
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    private static int countFishByName(List<Fish> fishList, String keyword) {
+        int count = 0;
+
+        for (Fish fish : fishList) {
+            if (fish != null && fish.getName() != null && fish.getName().contains(keyword)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static int countRareFish(List<Fish> fishList, int minStars) {
+        int count = 0;
+
+        for (Fish fish : fishList) {
+            if (fish != null && fish.getRarityStars() >= minStars) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static int countSpecies(List<Fish> fishList) {
+        Set<String> names = new HashSet<>();
+
+        for (Fish fish : fishList) {
+            if (fish != null && fish.getName() != null) {
+                names.add(fish.getName());
+            }
+        }
+
+        return names.size();
+    }
+
+    private static int totalFishValue(List<Fish> fishList) {
+        int total = 0;
+
+        for (Fish fish : fishList) {
+            if (fish != null) {
+                total += fish.getPrice();
+            }
+        }
+
+        return total;
+    }
+
+    private static void limitMissionProgress(Mission mission) {
+        if (mission.currentAmount < 0) {
+            mission.currentAmount = 0;
+        }
+
+        if (mission.currentAmount > mission.targetAmount) {
+            mission.currentAmount = mission.targetAmount;
+        }
+    }
+
+    private static void completeMission(Mission mission) {
+        if (mission == null || mission.completed) {
+            return;
+        }
+
+        mission.completed = true;
+        mission.currentAmount = mission.targetAmount;
+
+        if (!mission.rewardGiven) {
+            mission.rewardGiven = true;
+
+            try {
+                InventoryManager.addMoney(mission.reward);
+            } catch (Exception e) {
+                System.out.println("Mission completed, but reward could not be added.");
+            }
+        }
+
+        lastCompleteMessage = "任務完成：「" + mission.title + "」獲得 $" + mission.reward;
+        lastCompleteMessageTime = System.currentTimeMillis();
+
+        SwingUtilities.invokeLater(() -> {
+            try {
+                JOptionPane.showMessageDialog(null, lastCompleteMessage, "任務完成", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                System.out.println(lastCompleteMessage);
+            }
+        });
+    }
+
+    private static Mission findAcceptedMissionByTitle(String title) {
+        if (title == null) {
+            return null;
+        }
+
+        for (Mission mission : acceptedMissions) {
+            if (mission.title != null && mission.title.equals(title)) {
+                return mission;
+            }
+        }
+
+        return null;
+    }
+
+    private static Mission findAcceptedMissionById(String id) {
+        if (id == null) {
+            return null;
+        }
+
+        for (Mission mission : acceptedMissions) {
+            if (mission.id != null && mission.id.equals(id)) {
+                return mission;
+            }
+        }
+
+        return null;
+    }
+
+    private static String normalizeMissionId(String id, String title) {
+        if (id == null || id.trim().isEmpty() || id.equals(title)) {
+            return inferMissionId(title);
+        }
+
+        if (id.equals("COLLECT_FIVE_SPECIES")) {
+            return "COLLECT_5_SPECIES";
+        }
+
+        return id;
+    }
+
+    private static String inferMissionId(String title) {
+        if (title == null) {
+            return "UNKNOWN";
+        }
+
+        if (title.contains("沙丁")) {
+            return "CATCH_SARDINE";
+        }
+
+        if (title.contains("500")) {
+            return "REACH_DEPTH_500";
+        }
+
+        if (title.contains("小丑")) {
+            return "CATCH_CLOWNFISH";
+        }
+
+        if (title.contains("綠") || title.contains("青魚") || title.contains("鰻")) {
+            return "DEFEAT_GREEN_EEL";
+        }
+
+        if (title.contains("五種") || title.contains("5")) {
+            return "COLLECT_5_SPECIES";
+        }
+
+        if (title.contains("深海基地") || title.contains("基地")) {
+            return "EXPLORE_DEEP_BASE";
+        }
+
+        if (title.contains("高價") || title.contains("3000")) {
+            return "RETURN_VALUE_3000";
+        }
+
+        if (title.contains("返航") || title.contains("返回") || title.contains("安全")) {
+            return "SAFE_RETURN";
+        }
+
+        return title;
+    }
+
+    public static void clearAcceptedMissions() {
+        acceptedMissions.clear();
+        acceptedMission = null;
+        deepestDepthReached = 0;
+        defeatedGreenEelCount = 0;
+        safeReturnCount = 0;
+        exploredDeepBaseCount = 0;
+        lastCompleteMessage = "";
+        lastCompleteMessageTime = 0;
     }
 }
