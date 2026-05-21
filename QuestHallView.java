@@ -30,9 +30,9 @@ public class QuestHallView extends JFrame {
         private int tick = 0;
 
         // 這三個 Rectangle 只是「隱形點擊區」，不會畫出框框。
-        private Rectangle tavernRect = new Rectangle(45, 250, 310, 360);
+        private Rectangle tavernRect = new Rectangle(35, 140, 310, 455);
         private Rectangle captainRect = new Rectangle(675, 342, 250, 292);
-        private Rectangle missionBoardRect = new Rectangle(1165, 230, 390, 390);
+        private Rectangle missionBoardRect = new Rectangle(1165, 135, 390, 480);
         private Rectangle closeRect = new Rectangle(1390, 785, 150, 54);
 
         private boolean nearCaptain = false;
@@ -163,8 +163,7 @@ public class QuestHallView extends JFrame {
         }
 
         private void drawHighlights(Graphics2D g2) {
-            // 不畫任何灰色面板、酒館框、任務框或標籤。
-            // 左右兩側只保留隱形點擊區，畫面完全交給底圖呈現。
+            // 不畫任何額外灰框或標籤；只保留底圖本身與隱形點擊區。
         }
 
         private void drawCaptain(Graphics2D g2) {
