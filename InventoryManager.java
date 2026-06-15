@@ -121,6 +121,7 @@ public class InventoryManager {
     public static int sellFish(Fish fish) {
         if (storageList.remove(fish)) {
             money += fish.getPrice();
+            saveGame();
             return fish.getPrice();
         }
 
@@ -137,6 +138,11 @@ public class InventoryManager {
         }
 
         money += total;
+
+        if (total > 0) {
+            saveGame();
+        }
+
         return total;
     }
 
@@ -149,6 +155,10 @@ public class InventoryManager {
 
         storageList.clear();
         money += total;
+
+        if (total > 0) {
+            saveGame();
+        }
 
         return total;
     }
@@ -305,7 +315,7 @@ public class InventoryManager {
         storageMaterialMap.put(name, currentCount - amount);
         return true;
     }
-    
+
     public static boolean hasStorageMaterials(Map<String, Integer> requirements) {
         ensureMaterialMaps();
 
@@ -459,6 +469,7 @@ public class InventoryManager {
         }
 
         oxygenLevel++;
+        saveGame();
         return true;
     }
 
@@ -474,6 +485,7 @@ public class InventoryManager {
         }
 
         suitLevel++;
+        saveGame();
         return true;
     }
 
@@ -489,6 +501,7 @@ public class InventoryManager {
         }
 
         backpackLevel++;
+        saveGame();
         return true;
     }
 
@@ -520,6 +533,9 @@ public class InventoryManager {
 
             data.storageList = new ArrayList<>(storageList);
             data.currentDiveList = new ArrayList<>(currentDiveList);
+
+            // 重要：保存水族館展示中的魚
+            data.aquariumFishList = new ArrayList<>(AquariumManager.getAquariumFishSaveList());
 
             data.currentMaterials = new LinkedHashMap<>(currentMaterialMap);
             data.storageMaterials = new LinkedHashMap<>(storageMaterialMap);
@@ -575,6 +591,13 @@ public class InventoryManager {
                 currentDiveList = new ArrayList<>();
             }
 
+            // 重要：讀回水族館展示中的魚
+            if (data.aquariumFishList != null) {
+                AquariumManager.loadAquariumFishSaveList(data.aquariumFishList);
+            } else {
+                AquariumManager.loadAquariumFishSaveList(new ArrayList<>());
+            }
+
             currentMaterialMap = normalizeMaterialMap(data.currentMaterials);
             storageMaterialMap = normalizeMaterialMap(data.storageMaterials);
 
@@ -603,6 +626,9 @@ public class InventoryManager {
         oxygenLevel = 1;
         suitLevel = 1;
         backpackLevel = 1;
+
+        // 重要：新遊戲時清空水族館
+        AquariumManager.loadAquariumFishSaveList(new ArrayList<>());
 
         CollectionManager.resetUnlockedFish();
         WeaponManager.resetOwnedWeapons();

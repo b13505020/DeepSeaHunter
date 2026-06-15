@@ -85,9 +85,36 @@ public class AquariumManager {
         aquariumFishList.add(new AquariumFish(fish, false));
     }
 
+    
     public static List<AquariumFish> getAquariumFishList() {
-        return aquariumFishList;
+    return aquariumFishList;
+}
+
+public static java.util.List<Fish> getAquariumFishSaveList() {
+    java.util.List<Fish> result = new java.util.ArrayList<>();
+
+    for (AquariumFish aquariumFish : aquariumFishList) {
+        if (aquariumFish != null && aquariumFish.getFish() != null) {
+            result.add(aquariumFish.getFish());
+        }
     }
+
+    return result;
+}
+
+public static void loadAquariumFishSaveList(java.util.List<Fish> savedFishList) {
+    aquariumFishList.clear();
+
+    if (savedFishList == null) {
+        return;
+    }
+
+    for (Fish fish : savedFishList) {
+        if (fish != null) {
+            aquariumFishList.add(new AquariumFish(fish));
+        }
+    }
+}
 
     // 保留舊方法，避免其他舊程式還有用到 getAquariumFish()
     public static List<Fish> getAquariumFish() {

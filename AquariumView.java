@@ -32,6 +32,12 @@ public class AquariumView extends JPanel {
         }
     }
 
+    public void startAquarium() {
+        if (aquariumPanel != null) {
+            aquariumPanel.startAnimation();
+        }
+    }
+
     class AquariumPanel extends JPanel implements MouseMotionListener, MouseListener, KeyListener {
 
         private Image backgroundImg;
@@ -60,7 +66,6 @@ public class AquariumView extends JPanel {
         private Rectangle feedButtonRect = new Rectangle(1370, 555, 145, 50);
         private Rectangle feedShopCloseRect = new Rectangle(1500, 172, 28, 28);
 
-        // 已調整：往上移，避免跟底部訊息重疊
         private Rectangle exitButtonRect = new Rectangle(55, 730, 170, 52);
 
         private Rectangle tankRect = new Rectangle(75, 90, 1060, 545);
@@ -95,10 +100,19 @@ public class AquariumView extends JPanel {
             }
         }
 
+        public void startAnimation() {
+            if (timer != null && !timer.isRunning()) {
+                timer.start();
+            }
+
+            requestFocusInWindow();
+        }
+
         private double getScaleX() {
             if (getWidth() <= 0) {
                 return 1.0;
             }
+
             return getWidth() / (double) SCREEN_WIDTH;
         }
 
@@ -106,6 +120,7 @@ public class AquariumView extends JPanel {
             if (getHeight() <= 0) {
                 return 1.0;
             }
+
             return getHeight() / (double) SCREEN_HEIGHT;
         }
 
@@ -155,7 +170,14 @@ public class AquariumView extends JPanel {
                 double speed = 0.55 + (i % 5) * 0.18;
                 int direction = i % 2 == 0 ? 1 : -1;
 
-                displayFishList.add(new DisplayFish(entry, x, y, speed, direction));
+                DisplayFish displayFish = new DisplayFish(entry, x, y, speed, direction);
+
+                if (entry.getFish().getName().equals("海星")) {
+                    displayFish.y = tankRect.y + tankRect.height - displayFish.getHeight() - 70;
+                    displayFish.speed = 0;
+                }
+
+                displayFishList.add(displayFish);
             }
         }
 
@@ -187,6 +209,57 @@ public class AquariumView extends JPanel {
             return AquariumManager.getFullness(entry);
         }
 
+        private boolean isBottomCreature(DisplayFish fish) {
+    if (fish == null || fish.entry == null || fish.entry.getFish() == null) {
+        return false;
+    }
+
+    String name = fish.entry.getFish().getName();
+    String path = fish.entry.getFish().getImagePath();
+
+    if (path == null) {
+        path = "";
+    }
+
+    return name.equals("海星")
+        || name.equals("螃蟹")
+        || name.equals("礁岩蟹")
+        || path.contains("fish_crab")
+        || path.contains("reef_crab");
+}
+private boolean isStillBottomCreature(DisplayFish fish) {
+    if (fish == null || fish.entry == null || fish.entry.getFish() == null) {
+        return false;
+    }
+
+    String name = fish.entry.getFish().getName();
+    String path = fish.entry.getFish().getImagePath();
+
+    if (path == null) {
+        path = "";
+    }
+
+    return name.equals("海星") || path.contains("starfish");
+}
+
+private boolean isWalkingBottomCreature(DisplayFish fish) {
+    if (fish == null || fish.entry == null || fish.entry.getFish() == null) {
+        return false;
+    }
+
+    String name = fish.entry.getFish().getName();
+    String path = fish.entry.getFish().getImagePath();
+
+    if (path == null) {
+        path = "";
+    }
+
+    return name.equals("螃蟹")
+        || name.equals("礁岩蟹")
+        || path.contains("fish_crab")
+        || path.contains("reef_crab");
+}
+
         private void updateFallingFeed() {
             Iterator<FallingFeed> it = fallingFeeds.iterator();
 
@@ -203,16 +276,28 @@ public class AquariumView extends JPanel {
 
         private void updateFish() {
             for (DisplayFish fish : displayFishList) {
-                FallingFeed targetFeed = findNearestFeed(fish);
+    if (isStillBottomCreature(fish)) {
+        fish.y = tankRect.y + tankRect.height - fish.getHeight() - 70;
+        keepFishInsideTank(fish);
+        continue;
+    }
 
-                if (targetFeed != null) {
-                    moveFishTowardFeed(fish, targetFeed);
-                } else {
-                    swimNormally(fish);
-                }
+    if (isWalkingBottomCreature(fish)) {
+        walkOnBottom(fish);
+        keepFishInsideTank(fish);
+        continue;
+    }
 
-                keepFishInsideTank(fish);
-            }
+    FallingFeed targetFeed = findNearestFeed(fish);
+
+    if (targetFeed != null) {
+        moveFishTowardFeed(fish, targetFeed);
+    } else {
+        swimNormally(fish);
+    }
+
+    keepFishInsideTank(fish);
+}
 
             Iterator<FallingFeed> feedIterator = fallingFeeds.iterator();
 
@@ -279,11 +364,46 @@ public class AquariumView extends JPanel {
         }
 
         private void swimNormally(DisplayFish fish) {
-            fish.x += fish.speed * fish.direction;
-            fish.y += Math.sin((tick + fish.waveOffset) * 0.035) * 0.45;
-        }
+    fish.x += fish.speed * fish.direction;
+    fish.y += Math.sin((tick + fish.waveOffset) * 0.035) * 0.45;
+}
 
+private void walkOnBottom(DisplayFish fish) {
+    fish.y = tankRect.y + tankRect.height - fish.getHeight() - 70;
+
+    double walkSpeed = Math.max(0.35, fish.speed * 0.65);
+
+    fish.x += walkSpeed * fish.direction;
+}
         private void keepFishInsideTank(DisplayFish fish) {
+            if (isBottomCreature(fish)) {
+    int fishW = fish.getWidth();
+    int fishH = fish.getHeight();
+
+    int leftLimit = tankRect.x + 15;
+    int rightLimit = tankRect.x + tankRect.width - fishW - 15;
+    int bottomY = tankRect.y + tankRect.height - fishH - 70;
+
+    if (fish.x < leftLimit) {
+        fish.x = leftLimit;
+
+        if (isWalkingBottomCreature(fish)) {
+            fish.direction = 1;
+        }
+    }
+
+    if (fish.x > rightLimit) {
+        fish.x = rightLimit;
+
+        if (isWalkingBottomCreature(fish)) {
+            fish.direction = -1;
+        }
+    }
+
+    fish.y = bottomY;
+    return;
+}
+
             int fishW = fish.getWidth();
             int fishH = fish.getHeight();
 
@@ -315,6 +435,10 @@ public class AquariumView extends JPanel {
             Rectangle feedRect = feed.getBounds();
 
             for (DisplayFish fish : displayFishList) {
+                if (isBottomCreature(fish)) {
+                    continue;
+                }
+
                 if (fish.getBounds().intersects(feedRect)) {
                     return fish;
                 }
@@ -829,16 +953,14 @@ public class AquariumView extends JPanel {
         }
 
         private void drawMessage(Graphics2D g2) {
-    if (message == null || message.isEmpty()) {
-        return;
-    }
+            if (message == null || message.isEmpty()) {
+                return;
+            }
 
-    g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
-    g2.setColor(new Color(255, 235, 170));
-
-    // 歡迎訊息靠左顯示，放在離開按鈕上方，避免重疊
-    g2.drawString(message, 30, 835);
-}
+            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
+            g2.setColor(new Color(255, 235, 170));
+            g2.drawString(message, 30, 835);
+        }
 
         private void drawPanel(Graphics2D g2, int x, int y, int w, int h) {
             g2.setColor(new Color(0, 0, 0, 145));
@@ -1017,15 +1139,22 @@ public class AquariumView extends JPanel {
             return count;
         }
 
-        @Override public void mousePressed(MouseEvent e) {}
+        @Override
+        public void mousePressed(MouseEvent e) {
+        }
 
-        @Override public void mouseReleased(MouseEvent e) {}
+        @Override
+        public void mouseReleased(MouseEvent e) {
+        }
 
-        @Override public void mouseEntered(MouseEvent e) {
+        @Override
+        public void mouseEntered(MouseEvent e) {
             requestFocusInWindow();
         }
 
-        @Override public void mouseExited(MouseEvent e) {}
+        @Override
+        public void mouseExited(MouseEvent e) {
+        }
 
         @Override
         public void keyPressed(KeyEvent e) {
@@ -1038,9 +1167,13 @@ public class AquariumView extends JPanel {
             }
         }
 
-        @Override public void keyReleased(KeyEvent e) {}
+        @Override
+        public void keyReleased(KeyEvent e) {
+        }
 
-        @Override public void keyTyped(KeyEvent e) {}
+        @Override
+        public void keyTyped(KeyEvent e) {
+        }
     }
 
     class AquariumNpcDialog extends JDialog {
@@ -1132,26 +1265,45 @@ public class AquariumView extends JPanel {
         }
 
         private void putSelectedFishIntoAquarium() {
-            Fish selected = fishList.getSelectedValue();
+    Fish selected = fishList.getSelectedValue();
 
-            if (selected == null) {
-                statusLabel.setText("請先選一隻魚。");
-                return;
-            }
+    if (selected == null) {
+        statusLabel.setText("請先選一隻魚。");
+        return;
+    }
 
-            boolean removed = InventoryManager.getStorage().remove(selected);
+    boolean removed = InventoryManager.getStorage().remove(selected);
 
-            if (!removed) {
-                statusLabel.setText("放入失敗，這隻魚可能已經不在儲藏箱。");
-                reloadStorageFish();
-                return;
-            }
+    if (!removed) {
+        statusLabel.setText("放入失敗，這隻魚可能已經不在儲藏箱。");
+        reloadStorageFish();
+        return;
+    }
 
-            AquariumManager.addFish(selected);
-            aquariumPanel.refreshAquariumFishAfterStorageChange();
-            reloadStorageFish();
-            statusLabel.setText("已將「" + selected.getName() + "」放入水族館。");
+    // 先更新水族館資料
+    AquariumManager.addFish(selected);
+
+    // 先更新畫面，讓魚馬上出現，不要等存檔
+    aquariumPanel.refreshAquariumFishAfterStorageChange();
+    reloadStorageFish();
+    statusLabel.setText("已將「" + selected.getName() + "」放入水族館，正在儲存...");
+
+    // 存檔放到背景執行，避免畫面卡住
+    SwingWorker<Void, Void> saveWorker = new SwingWorker<Void, Void>() {
+        @Override
+        protected Void doInBackground() {
+            InventoryManager.saveGame();
+            return null;
         }
+
+        @Override
+        protected void done() {
+            statusLabel.setText("已將「" + selected.getName() + "」放入水族館，並完成存檔。");
+        }
+    };
+
+    saveWorker.execute();
+}
 
         private void sellSelectedFish() {
             Fish selected = fishList.getSelectedValue();
@@ -1300,12 +1452,124 @@ public class AquariumView extends JPanel {
         }
 
         public int getWidth() {
-            return Math.max(38, 70 + sizeBoost);
-        }
+    Fish fish = entry.getFish();
+    String name = fish.getName();
+    String path = fish.getImagePath();
 
-        public int getHeight() {
-            return Math.max(28, 54 + sizeBoost);
-        }
+    if (path == null) {
+        path = "";
+    }
+
+    // 原本深海魚圖片：全部縮小
+    if (path.contains("fish_anchovy")) {
+        return 52;
+    } else if (path.contains("fish_clownfish")) {
+        return 58;
+    } else if (path.contains("fish_crab")) {
+        return 62;
+    } else if (path.contains("fish_pufferfish")) {
+        return 60;
+    } else if (path.contains("fish_surgefish")) {
+        return 66;
+    } else if (path.contains("fish_angelfish")) {
+        return 64;
+    } else if (path.contains("fish_goldfish")) {
+        return 58;
+    } else if (path.contains("fish_green")) {
+        return 68;
+    }
+
+    // 淺水魚圖片：放大一點
+    if (path.contains("silver_reef")) {
+        return 110;
+    } else if (path.contains("starfish")) {
+        return 120;
+    } else if (path.contains("seahorse")) {
+        return 85;
+    } else if (path.contains("reef_crab")) {
+        return 130;
+    } else if (path.contains("parrotfish")) {
+        return 120;
+    } else if (path.contains("clownfish")) {
+        return 115;
+    } else if (path.contains("butterflyfish")) {
+        return 115;
+    } else if (path.contains("boxfish")) {
+        return 115;
+    }
+
+    // 用名字補判斷
+    if (name.equals("海星")) {
+        return 120;
+    } else if (name.equals("礁岩蟹")) {
+        return 130;
+    } else if (name.equals("海馬")) {
+        return 85;
+    }
+
+    // 其他未知魚，不要太大
+    return 70;
+}
+
+public int getHeight() {
+    Fish fish = entry.getFish();
+    String name = fish.getName();
+    String path = fish.getImagePath();
+
+    if (path == null) {
+        path = "";
+    }
+
+    // 原本深海魚圖片：全部縮小
+    if (path.contains("fish_anchovy")) {
+        return 34;
+    } else if (path.contains("fish_clownfish")) {
+        return 42;
+    } else if (path.contains("fish_crab")) {
+        return 46;
+    } else if (path.contains("fish_pufferfish")) {
+        return 46;
+    } else if (path.contains("fish_surgefish")) {
+        return 45;
+    } else if (path.contains("fish_angelfish")) {
+        return 48;
+    } else if (path.contains("fish_goldfish")) {
+        return 44;
+    } else if (path.contains("fish_green")) {
+        return 48;
+    }
+
+    // 淺水魚圖片：放大一點
+    if (path.contains("silver_reef")) {
+        return 75;
+    } else if (path.contains("starfish")) {
+        return 120;
+    } else if (path.contains("seahorse")) {
+        return 130;
+    } else if (path.contains("reef_crab")) {
+        return 95;
+    } else if (path.contains("parrotfish")) {
+        return 85;
+    } else if (path.contains("clownfish")) {
+        return 85;
+    } else if (path.contains("butterflyfish")) {
+        return 85;
+    } else if (path.contains("boxfish")) {
+        return 85;
+    }
+
+    // 用名字補判斷
+    if (name.equals("海星")) {
+        return 120;
+    } else if (name.equals("礁岩蟹")) {
+        return 95;
+    } else if (name.equals("海馬")) {
+        return 130;
+    }
+
+    // 其他未知魚，不要太大
+    return 50;
+}
 
         public Rectangle getBounds() {
             return new Rectangle((int) x, (int) y, getWidth(), getHeight());

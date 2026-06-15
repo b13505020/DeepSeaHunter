@@ -15,23 +15,38 @@ public class SaveData implements Serializable {
     int suitLevel;
     int backpackLevel;
 
+    // 魚類儲藏箱
     List<Fish> storageList;
+
+    // 本次潛水背包
     List<Fish> currentDiveList;
 
+    // 水族館展示中的魚
+    List<Fish> aquariumFishList;
+
+    // 圖鑑解鎖魚
+    Set<String> unlockedFish;
+
+    // 沙灘素材：本次暫存
     Map<String, Integer> currentMaterials;
+
+    // 沙灘素材：永久儲藏
     Map<String, Integer> storageMaterials;
 
-    Set<String> unlockedFish;
+    // 已擁有武器
+    // 重點：這裡要用 Set<String>，不要用 List<String>
     Set<String> ownedWeapons;
 
     public SaveData() {
         storageList = new ArrayList<>();
         currentDiveList = new ArrayList<>();
+        aquariumFishList = new ArrayList<>();
+
+        unlockedFish = new HashSet<>();
 
         currentMaterials = new LinkedHashMap<>();
         storageMaterials = new LinkedHashMap<>();
 
-        unlockedFish = new HashSet<>();
         ownedWeapons = new HashSet<>();
     }
 }

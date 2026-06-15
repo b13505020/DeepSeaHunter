@@ -219,13 +219,14 @@ public class GameLauncher extends JFrame {
                 });
             },
             e -> {
-                hideMissionHud();
-                cardLayout.show(mainPanel, "AquariumScreen");
+    hideMissionHud();
+    cardLayout.show(mainPanel, "AquariumScreen");
 
-                SwingUtilities.invokeLater(() -> {
-                    aquariumPanel.requestFocusInWindow();
-                });
-            },
+    SwingUtilities.invokeLater(() -> {
+        aquariumPanel.startAquarium();
+        aquariumPanel.requestFocusInWindow();
+    });
+},
             e -> {
                 hideMissionHud();
 
