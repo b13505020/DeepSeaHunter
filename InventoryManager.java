@@ -305,6 +305,47 @@ public class InventoryManager {
         storageMaterialMap.put(name, currentCount - amount);
         return true;
     }
+    
+    public static boolean hasStorageMaterials(Map<String, Integer> requirements) {
+        ensureMaterialMaps();
+
+        if (requirements == null || requirements.isEmpty()) {
+            return true;
+        }
+
+        for (Map.Entry<String, Integer> entry : requirements.entrySet()) {
+            String name = entry.getKey();
+            int amount = Math.max(0, entry.getValue());
+
+            if (storageMaterialMap.getOrDefault(name, 0) < amount) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean spendStorageMaterials(Map<String, Integer> requirements) {
+        ensureMaterialMaps();
+
+        if (!hasStorageMaterials(requirements)) {
+            return false;
+        }
+
+        if (requirements == null) {
+            return true;
+        }
+
+        for (Map.Entry<String, Integer> entry : requirements.entrySet()) {
+            String name = entry.getKey();
+            int amount = Math.max(0, entry.getValue());
+            int currentCount = storageMaterialMap.getOrDefault(name, 0);
+
+            storageMaterialMap.put(name, currentCount - amount);
+        }
+
+        return true;
+    }
 
     // =========================
     // 裝備等級 getter

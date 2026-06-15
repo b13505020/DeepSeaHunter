@@ -5,6 +5,7 @@ import java.io.File;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
+import java.util.Map;
 
 public class WeaponShopScreen extends JPanel {
 
@@ -22,10 +23,12 @@ public class WeaponShopScreen extends JPanel {
     private int bossRightLimit = 210;
 
     private String[] bossLines = {
-    "鐵匠：想換更猛的傢伙？錢夠就自己挑。",
+    "鐵匠：想換更猛的傢伙？付錢或帶材料來都行。",
     "鐵匠：水下可不是開玩笑的地方，武器要選對。",
     "鐵匠：狙擊槍打得遠，榴彈發射器火力猛。",
-    "鐵匠：沒錢就先去賣魚，別只會看。"
+    "鐵匠：沒錢就先去賣魚，別只會看。",
+    "鐵匠：沙灘上的齒輪、珊瑚和石材都能拿來製作。",
+    "鐵匠：沒錢就去海灘找材料，我照樣能幫你打造。"
 };
 
     private int currentBossLine = 0;
@@ -95,15 +98,15 @@ public class WeaponShopScreen extends JPanel {
 
     private void setupUI() {
         JButton exitBtn = new JButton("EXIT");
-        exitBtn.setBounds(50, 800, 150, 50);
+        exitBtn.setBounds(1360, 790, 150, 60);
         exitBtn.setFocusable(false);
         exitBtn.addActionListener(e -> backAction.actionPerformed(null));
         add(exitBtn);
 
         moneyLabel = new JLabel();
-        moneyLabel.setBounds(1030, 120, 430, 40);
+        moneyLabel.setBounds(1015, 790, 480, 40);
         moneyLabel.setForeground(Color.YELLOW);
-        moneyLabel.setFont(new Font("Monospaced", Font.BOLD, 24));
+        moneyLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 21));
         add(moneyLabel);
 
         weaponListPanel = new JPanel();
@@ -111,7 +114,7 @@ public class WeaponShopScreen extends JPanel {
         weaponListPanel.setBackground(new Color(20, 35, 45));
 
         JScrollPane scrollPane = new JScrollPane(weaponListPanel);
-        scrollPane.setBounds(1000, 180, 500, 580);
+        scrollPane.setBounds(1000, 170, 500, 560);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane);
 
@@ -197,7 +200,10 @@ public class WeaponShopScreen extends JPanel {
         return false;
     }
     private void refreshWeaponList() {
-        moneyLabel.setText("Money: $" + InventoryManager.getMoney());
+        moneyLabel.setText(
+            "金錢：$" + InventoryManager.getMoney()
+            + "　｜　儲藏素材：" + InventoryManager.getStorageMaterialTotalCount()
+        );
 
         weaponListPanel.removeAll();
 
@@ -212,8 +218,8 @@ public class WeaponShopScreen extends JPanel {
 
     private JPanel createWeaponCard(Weapon weapon) {
         JPanel card = new JPanel(new BorderLayout(10, 10));
-        card.setMaximumSize(new Dimension(460, 115));
-        card.setPreferredSize(new Dimension(460, 115));
+        card.setMaximumSize(new Dimension(460, 150));
+        card.setPreferredSize(new Dimension(460, 150));
         card.setBackground(new Color(45, 65, 80));
         card.setBorder(BorderFactory.createLineBorder(new Color(0, 220, 255), 2));
 
@@ -234,22 +240,30 @@ public class WeaponShopScreen extends JPanel {
         card.add(imgLabel, BorderLayout.WEST);
 
         int price = WeaponManager.getPrice(weapon);
+        String recipeText = buildRecipeHtml(weapon);
 
         JLabel infoLabel = new JLabel(
             "<html>"
             + "<b style='color:white; font-size:14px;'>" + weapon.getName() + "</b><br>"
             + "<span style='color:#DDDDDD;'>Damage: " + weapon.getDamage() + "</span><br>"
             + "<span style='color:#DDDDDD;'>Range: " + weapon.getRange() + "</span><br>"
-            + "<span style='color:#FFD966;'>Price: $" + price + "</span>"
+            + "<span style='color:#FFD966;'>金錢購買：$" + price + "</span><br>"
+            + recipeText
             + "</html>"
         );
         card.add(infoLabel, BorderLayout.CENTER);
 
         JButton buyBtn = new JButton();
+        JButton craftBtn = new JButton("CRAFT");
+        JPanel actionPanel = new JPanel(new GridLayout(2, 1, 0, 8));
+        actionPanel.setOpaque(false);
+        actionPanel.setPreferredSize(new Dimension(92, 96));
 
         if (WeaponManager.isOwned(weapon)) {
             buyBtn.setText("OWNED");
             buyBtn.setEnabled(false);
+            craftBtn.setText("OWNED");
+            craftBtn.setEnabled(false);
         } else {
             buyBtn.setText("BUY");
             buyBtn.addActionListener(e -> {
@@ -264,13 +278,93 @@ public class WeaponShopScreen extends JPanel {
                 refreshWeaponList();
                 requestFocusInWindow();
             });
+        
+            craftBtn.setEnabled(WeaponManager.canCraft(weapon));
+            craftBtn.setToolTipText(
+                craftBtn.isEnabled()
+                ? "使用儲藏箱內的沙灘素材製作"
+                : "儲藏箱內的製作素材不足"
+            );
+            craftBtn.addActionListener(e -> {
+                boolean success = WeaponManager.craftWeapon(weapon);
+
+                if (success) {
+                    JOptionPane.showMessageDialog(this, "製作成功：" + weapon.getName());
+                } else {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "製作素材不足：\n" + buildMissingMaterialText(weapon)
+                    );
+                }
+
+                refreshWeaponList();
+                requestFocusInWindow();
+            });
         }
 
-        buyBtn.setPreferredSize(new Dimension(90, 40));
         buyBtn.setFocusable(false);
-        card.add(buyBtn, BorderLayout.EAST);
+        craftBtn.setFocusable(false);
+        actionPanel.add(buyBtn);
+        actionPanel.add(craftBtn);
+        card.add(actionPanel, BorderLayout.EAST);
 
         return card;
+    }
+
+    private String buildRecipeHtml(Weapon weapon) {
+        Map<String, Integer> recipe = WeaponManager.getRecipe(weapon);
+
+        if (recipe.isEmpty()) {
+            return "<span style='color:#AAAAAA;'>初始武器，不需製作</span>";
+        }
+
+        StringBuilder text = new StringBuilder(
+            "<span style='color:#8FE8FF;'>素材製作：</span>"
+        );
+        boolean first = true;
+
+        for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
+            if (!first) {
+                text.append("、");
+            }
+
+            int owned = InventoryManager.getStorageMaterialCount(entry.getKey());
+            String color = owned >= entry.getValue() ? "#9CFF9C" : "#FF9C9C";
+            text.append("<span style='color:")
+                .append(color)
+                .append(";'>")
+                .append(entry.getKey())
+                .append(" ")
+                .append(owned)
+                .append("/")
+                .append(entry.getValue())
+                .append("</span>");
+            first = false;
+        }
+
+        return text.toString();
+    }
+
+    private String buildMissingMaterialText(Weapon weapon) {
+        StringBuilder text = new StringBuilder();
+
+        for (Map.Entry<String, Integer> entry : WeaponManager.getRecipe(weapon).entrySet()) {
+            int owned = InventoryManager.getStorageMaterialCount(entry.getKey());
+
+            if (owned < entry.getValue()) {
+                if (text.length() > 0) {
+                    text.append("\n");
+                }
+
+                text.append(entry.getKey())
+                    .append("：")
+                    .append(owned)
+                    .append("/")
+                    .append(entry.getValue());
+            }
+        }
+
+        return text.length() == 0 ? "請重新開啟武器商店後再試。" : text.toString();
     }
 
     @Override
