@@ -21,6 +21,7 @@ public class GameLauncher extends JFrame {
 
     private JPanel titlePanel;
     private boolean gameStarted = false;
+    private String currentScreen = "TitleScreen";
 
     private MissionHudOverlay missionHud;
 
@@ -46,17 +47,17 @@ public class GameLauncher extends JFrame {
         setGlassPane(missionHud);
         hideMissionHud();
 
-        cardLayout.show(mainPanel, "TitleScreen");
+        showScreen("TitleScreen");
 
         mainPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
-            "exitGame"
+            "goBack"
         );
 
-        mainPanel.getActionMap().put("exitGame", new AbstractAction() {
+        mainPanel.getActionMap().put("goBack", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                exitGame();
+                handleEscape();
             }
         });
 
@@ -81,6 +82,34 @@ public class GameLauncher extends JFrame {
             missionHud.setVisible(false);
             missionHud.repaint();
         }
+    }
+
+    private void showScreen(String screenName) {
+        currentScreen = screenName;
+        cardLayout.show(mainPanel, screenName);
+        mainPanel.revalidate();
+        mainPanel.repaint();
+    }
+
+    private void handleEscape() {
+        if ("TitleScreen".equals(currentScreen) || "LandScreen".equals(currentScreen)) {
+            return;
+        }
+
+        returnToLand();
+    }
+
+    private void returnToLand() {
+        if (!gameStarted || landPanel == null) {
+            return;
+        }
+
+        showMissionHud();
+        showScreen("LandScreen");
+
+        SwingUtilities.invokeLater(() -> {
+            landPanel.requestFocusInWindow();
+        });
     }
 
     private void setupWindowCloseSave() {
@@ -111,65 +140,38 @@ public class GameLauncher extends JFrame {
         mainPanel.removeAll();
 
         oceanPanel = new OceanWorld(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
+            returnToLand();
 
             SwingUtilities.invokeLater(() -> {
                 landPanel.resetPlayerPosition();
-                landPanel.requestFocusInWindow();
             });
         });
 
         gearShopPanel = new GearShopScreen(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
-
-            SwingUtilities.invokeLater(() -> {
-                landPanel.requestFocusInWindow();
-            });
+            returnToLand();
         });
 
         weaponShopPanel = new WeaponShopScreen(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
-
-            SwingUtilities.invokeLater(() -> {
-                landPanel.requestFocusInWindow();
-            });
+            returnToLand();
         });
 
         beachPanel = new BeachWorld(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
-
-            SwingUtilities.invokeLater(() -> {
-                landPanel.requestFocusInWindow();
-            });
+            returnToLand();
         });
 
         aquariumPanel = new AquariumView(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
-
-            SwingUtilities.invokeLater(() -> {
-                landPanel.requestFocusInWindow();
-            });
+            returnToLand();
         });
 
         questHallPanel = new QuestHallView(e -> {
-            showMissionHud();
-            cardLayout.show(mainPanel, "LandScreen");
-
-            SwingUtilities.invokeLater(() -> {
-                landPanel.requestFocusInWindow();
-            });
+            returnToLand();
         });
 
         landPanel = new LandWorld(
             e -> {
                 oceanPanel.resetPlayerPosition();
                 showMissionHud();
-                cardLayout.show(mainPanel, "OceanScreen");
+                showScreen("OceanScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     oceanPanel.requestFocusInWindow();
@@ -177,7 +179,7 @@ public class GameLauncher extends JFrame {
             },
             e -> {
                 hideMissionHud();
-                cardLayout.show(mainPanel, "GearShopScreen");
+                showScreen("GearShopScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     gearShopPanel.requestFocusInWindow();
@@ -185,7 +187,7 @@ public class GameLauncher extends JFrame {
             },
             e -> {
                 hideMissionHud();
-                cardLayout.show(mainPanel, "QuestHallScreen");
+                showScreen("QuestHallScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     questHallPanel.requestFocusInWindow();
@@ -194,7 +196,7 @@ public class GameLauncher extends JFrame {
             e -> {
                 hideMissionHud();
                 beachPanel.resetForEntry();
-                cardLayout.show(mainPanel, "BeachScreen");
+                showScreen("BeachScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     beachPanel.requestFocusInWindow();
@@ -202,7 +204,7 @@ public class GameLauncher extends JFrame {
             },
             e -> {
                 hideMissionHud();
-                cardLayout.show(mainPanel, "WeaponShopScreen");
+                showScreen("WeaponShopScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     weaponShopPanel.requestFocusInWindow();
@@ -210,7 +212,7 @@ public class GameLauncher extends JFrame {
             },
             e -> {
                 hideMissionHud();
-                cardLayout.show(mainPanel, "AquariumScreen");
+                showScreen("AquariumScreen");
 
                 SwingUtilities.invokeLater(() -> {
                     aquariumPanel.requestFocusInWindow();
@@ -220,9 +222,7 @@ public class GameLauncher extends JFrame {
                 hideMissionHud();
 
                 SwingUtilities.invokeLater(() -> {
-                    cardLayout.show(mainPanel, "TitleScreen");
-                    mainPanel.revalidate();
-                    mainPanel.repaint();
+                    showScreen("TitleScreen");
                     titlePanel.requestFocusInWindow();
                 });
             }
@@ -262,7 +262,7 @@ public class GameLauncher extends JFrame {
 
         showMissionHud();
 
-        cardLayout.show(mainPanel, "LandScreen");
+        showScreen("LandScreen");
 
         SwingUtilities.invokeLater(() -> {
             landPanel.requestFocusInWindow();
@@ -288,7 +288,7 @@ public class GameLauncher extends JFrame {
 
         showMissionHud();
 
-        cardLayout.show(mainPanel, "LandScreen");
+        showScreen("LandScreen");
 
         SwingUtilities.invokeLater(() -> {
             landPanel.requestFocusInWindow();
