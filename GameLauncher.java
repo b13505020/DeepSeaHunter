@@ -68,6 +68,61 @@ public class GameLauncher extends JFrame {
         gd.setFullScreenWindow(this);
 
         setVisible(true);
+        playAppleMusicPlaylist();
+    }
+
+    private void playAppleMusicPlaylist() {
+        if (!isMacOS()) {
+            System.out.println("Apple Music 自動播放功能僅支援 macOS。");
+            return;
+        }
+
+        try {
+            new ProcessBuilder(
+                "osascript",
+                "-e",
+                "tell application \"Music\"",
+                "-e",
+                "set targetPlaylist to user playlist \"🌪️\"",
+                "-e",
+                "set trackCount to count of tracks of targetPlaylist",
+                "-e",
+                "if trackCount is 0 then return",
+                "-e",
+                "set randomIndex to random number from 1 to trackCount",
+                "-e",
+                "set shuffle enabled to true",
+                "-e",
+                "set song repeat to all",
+                "-e",
+                "play track randomIndex of targetPlaylist",
+                "-e",
+                "end tell"
+            ).start();
+        } catch (Exception e) {
+            System.out.println("無法播放 Apple Music 歌單：" + e.getMessage());
+        }
+    }
+
+    private void stopAppleMusic() {
+        if (!isMacOS()) {
+            return;
+        }
+
+        try {
+            new ProcessBuilder(
+                "osascript",
+                "-e",
+                "tell application \"Music\" to pause"
+            ).start();
+        } catch (Exception e) {
+            System.out.println("無法暫停 Apple Music：" + e.getMessage());
+        }
+    }
+
+    private boolean isMacOS() {
+        String osName = System.getProperty("os.name", "");
+        return osName.toLowerCase().contains("mac");
     }
 
     private void showMissionHud() {
@@ -125,6 +180,8 @@ public class GameLauncher extends JFrame {
         if (gameStarted) {
             InventoryManager.saveGame();
         }
+
+        stopAppleMusic();
 
         GraphicsDevice gd = GraphicsEnvironment
             .getLocalGraphicsEnvironment()
