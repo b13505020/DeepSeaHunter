@@ -150,6 +150,33 @@ public class OceanWorld extends JPanel {
         add(colBtn);
     }
 
+    // =========================
+    // 全螢幕縮放用：把真實滑鼠座標轉回 1600 x 900 遊戲座標
+    // =========================
+    private double getScaleX() {
+        if (getWidth() <= 0) {
+            return 1.0;
+        }
+
+        return getWidth() / (double) SCREEN_WIDTH;
+    }
+
+    private double getScaleY() {
+        if (getHeight() <= 0) {
+            return 1.0;
+        }
+
+        return getHeight() / (double) SCREEN_HEIGHT;
+    }
+
+    private int toGameX(int screenX) {
+        return (int) (screenX / getScaleX());
+    }
+
+    private int toGameY(int screenY) {
+        return (int) (screenY / getScaleY());
+    }
+
     private void setupControls() {
         addKeyListener(new KeyAdapter() {
             @Override
@@ -195,12 +222,12 @@ public class OceanWorld extends JPanel {
         addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                updateAimAngle(e.getX(), e.getY());
+                updateAimAngle(toGameX(e.getX()), toGameY(e.getY()));
             }
         
             @Override
             public void mouseDragged(MouseEvent e) {
-                updateAimAngle(e.getX(), e.getY());
+                updateAimAngle(toGameX(e.getX()), toGameY(e.getY()));
             }
         });
        
@@ -208,7 +235,7 @@ public class OceanWorld extends JPanel {
             @Override
             public void mousePressed(MouseEvent e) {
                 requestFocusInWindow();
-                updateAimAngle(e.getX(), e.getY());
+                updateAimAngle(toGameX(e.getX()), toGameY(e.getY()));
                 fire();
             }
         });
@@ -424,9 +451,9 @@ public class OceanWorld extends JPanel {
                     fishList.remove(i);
                 } else {
                     JOptionPane.showMessageDialog(
-                      this,
-                     "背包已滿！請先返回陸地結算，或去商店升級背包。"
-                     );
+                        this,
+                        "背包已滿！請先返回陸地結算，或去商店升級背包。"
+                    );
 
                     // 背包滿時，把玩家稍微推離這隻魚，避免一直觸發碰撞視窗
                     pushPlayerAwayFromFish(f);
@@ -438,47 +465,48 @@ public class OceanWorld extends JPanel {
             }
         }
     }
+
     private void pushPlayerAwayFromFish(OceanFish f) {
-    Rectangle fishRect = f.getBounds();
+        Rectangle fishRect = f.getBounds();
 
-    double playerCenterX = playerX + PLAYER_WIDTH / 2.0;
-    double playerCenterY = playerY + PLAYER_HEIGHT / 2.0;
+        double playerCenterX = playerX + PLAYER_WIDTH / 2.0;
+        double playerCenterY = playerY + PLAYER_HEIGHT / 2.0;
 
-    double fishCenterX = fishRect.getCenterX();
-    double fishCenterY = fishRect.getCenterY();
+        double fishCenterX = fishRect.getCenterX();
+        double fishCenterY = fishRect.getCenterY();
 
-    double dx = playerCenterX - fishCenterX;
-    double dy = playerCenterY - fishCenterY;
+        double dx = playerCenterX - fishCenterX;
+        double dy = playerCenterY - fishCenterY;
 
-    double distance = Math.sqrt(dx * dx + dy * dy);
+        double distance = Math.sqrt(dx * dx + dy * dy);
 
-    // 如果剛好中心重疊，就預設往上推
-    if (distance == 0) {
-        dx = 0;
-        dy = -1;
-        distance = 1;
+        // 如果剛好中心重疊，就預設往上推
+        if (distance == 0) {
+            dx = 0;
+            dy = -1;
+            distance = 1;
+        }
+
+        dx /= distance;
+        dy /= distance;
+
+        // 推開距離，可以自己調大或調小
+        double pushDistance = 220;
+
+        playerX += dx * pushDistance;
+        playerY += dy * pushDistance;
+
+        // 限制玩家不要被推出地圖外
+        playerX = clamp(playerX, 0, worldWidth - PLAYER_WIDTH);
+
+        int maxDepth = InventoryManager.getMaxDepth();
+        double maxYBySuit = 400 + maxDepth;
+        double maxYByMap = worldHeight - PLAYER_HEIGHT;
+
+        playerY = clamp(playerY, 400, Math.min(maxYBySuit, maxYByMap));
+
+        updateCamera();
     }
-
-    dx /= distance;
-    dy /= distance;
-
-    // 推開距離，可以自己調大或調小
-    double pushDistance = 220;
-
-    playerX += dx * pushDistance;
-    playerY += dy * pushDistance;
-
-    // 限制玩家不要被推出地圖外
-    playerX = clamp(playerX, 0, worldWidth - PLAYER_WIDTH);
-
-    int maxDepth = InventoryManager.getMaxDepth();
-    double maxYBySuit = 400 + maxDepth;
-    double maxYByMap = worldHeight - PLAYER_HEIGHT;
-
-    playerY = clamp(playerY, 400, Math.min(maxYBySuit, maxYByMap));
-
-    updateCamera();
-}
 
     private void checkSurfaceInteraction(ActionListener backAction) {
         if (isShowingReturnDialog) {
@@ -498,6 +526,7 @@ public class OceanWorld extends JPanel {
 
             if (result == JOptionPane.YES_OPTION) {
                 InventoryManager.moveToStorage();
+                InventoryManager.saveGame();
                 backAction.actionPerformed(null);
             } else {
                 playerY = 550;
@@ -612,7 +641,12 @@ public class OceanWorld extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        Graphics2D g2d = (Graphics2D) g;
+        Graphics2D g2d = (Graphics2D) g.create();
+
+        double scaleX = getWidth() / (double) SCREEN_WIDTH;
+        double scaleY = getHeight() / (double) SCREEN_HEIGHT;
+
+        g2d.scale(scaleX, scaleY);
 
         if (oceanMap != null) {
             g2d.drawImage(
@@ -625,7 +659,7 @@ public class OceanWorld extends JPanel {
             );
         } else {
             g2d.setColor(new Color(0, 40, 90));
-            g2d.fillRect(0, 0, getWidth(), getHeight());
+            g2d.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         }
 
         for (OceanFish f : fishList) {
@@ -671,10 +705,10 @@ public class OceanWorld extends JPanel {
             );
         }
 
-        g.setColor(Color.YELLOW);
+        g2d.setColor(Color.YELLOW);
 
         for (Bullet b : bullets) {
-            g.fillOval(
+            g2d.fillOval(
                 b.getX() - cameraX,
                 b.getY() - cameraY,
                 10,
@@ -718,20 +752,14 @@ public class OceanWorld extends JPanel {
             g2d.fillRect(sx, sy, PLAYER_WIDTH, PLAYER_HEIGHT);
         }
         
-        // 新增：畫出目前手持的武器
+        // 畫出目前手持的武器
         drawCurrentWeapon(g2d, sx, sy);
         
-        // 原本的白色瞄準線先註解掉，不然會蓋在武器上
-        // g2d.setColor(Color.WHITE);
-        // g2d.drawLine(
-        //     sx + PLAYER_WIDTH / 2,
-        //     sy + PLAYER_HEIGHT / 2,
-        //     sx + PLAYER_WIDTH / 2 + (int) (Math.cos(Math.toRadians(aimAngle)) * 50),
-        //     sy + PLAYER_HEIGHT / 2 + (int) (Math.sin(Math.toRadians(aimAngle)) * 50)
-        // );
-        
         drawUI(g2d);
+
+        g2d.dispose();
     }
+
     private BufferedImage getWeaponImage(Weapon weapon) {
         String imagePath = WeaponManager.getImagePath(weapon);
     
