@@ -8,33 +8,28 @@ import java.util.Iterator;
 import java.util.List;
 import javax.imageio.ImageIO;
 
-public class AquariumView extends JFrame {
+public class AquariumView extends JPanel {
+
+    public static final int SCREEN_WIDTH = 1600;
+    public static final int SCREEN_HEIGHT = 900;
 
     private AquariumPanel aquariumPanel;
+    private ActionListener backToLandAction;
 
-    public AquariumView() {
-        setTitle("Aquarium - 水族館");
-        setSize(1600, 900);
-        setLocationRelativeTo(null);
-        setResizable(false);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+    public AquariumView(ActionListener backToLandAction) {
+        this.backToLandAction = backToLandAction;
+
+        setLayout(new BorderLayout());
+        setFocusable(true);
 
         aquariumPanel = new AquariumPanel();
-        add(aquariumPanel);
+        add(aquariumPanel, BorderLayout.CENTER);
+    }
 
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                aquariumPanel.stopAnimation();
-            }
-
-            @Override
-            public void windowClosed(WindowEvent e) {
-                aquariumPanel.stopAnimation();
-            }
-        });
-
-        setVisible(true);
+    public void stopAquarium() {
+        if (aquariumPanel != null) {
+            aquariumPanel.stopAnimation();
+        }
     }
 
     class AquariumPanel extends JPanel implements MouseMotionListener, MouseListener, KeyListener {
@@ -59,7 +54,6 @@ public class AquariumView extends JFrame {
         private String selectedFeedType = "basic";
         private String message = "歡迎來到水族館。點導覽員可以把儲藏箱的魚放進水族館。";
 
-        // 導覽員已改到飼料攤左下方，不會被右下被動收入面板擋住
         private Rectangle guideRect = new Rectangle(1085, 515, 120, 170);
 
         private Rectangle buyButtonRect = new Rectangle(1210, 555, 145, 50);
@@ -67,7 +61,6 @@ public class AquariumView extends JFrame {
         private Rectangle feedShopCloseRect = new Rectangle(1500, 172, 28, 28);
         private Rectangle exitButtonRect = new Rectangle(55, 790, 160, 52);
 
-        // 依你的背景圖調整：魚和飼料都限制在水族箱範圍內
         private Rectangle tankRect = new Rectangle(75, 90, 1060, 545);
 
         public AquariumPanel() {
@@ -88,6 +81,7 @@ public class AquariumView extends JFrame {
                 updateFish();
                 repaint();
             });
+
             timer.start();
 
             SwingUtilities.invokeLater(() -> requestFocusInWindow());
@@ -97,6 +91,31 @@ public class AquariumView extends JFrame {
             if (timer != null) {
                 timer.stop();
             }
+        }
+
+        private double getScaleX() {
+            if (getWidth() <= 0) {
+                return 1.0;
+            }
+            return getWidth() / (double) SCREEN_WIDTH;
+        }
+
+        private double getScaleY() {
+            if (getHeight() <= 0) {
+                return 1.0;
+            }
+            return getHeight() / (double) SCREEN_HEIGHT;
+        }
+
+        private Point toGamePoint(Point p) {
+            if (p == null) {
+                return new Point(-9999, -9999);
+            }
+
+            return new Point(
+                (int) (p.x / getScaleX()),
+                (int) (p.y / getScaleY())
+            );
         }
 
         private void loadImages() {
@@ -110,9 +129,11 @@ public class AquariumView extends JFrame {
         private Image loadImage(String path) {
             try {
                 File file = new File(path);
+
                 if (!file.exists()) {
                     return null;
                 }
+
                 return ImageIO.read(file);
             } catch (Exception e) {
                 return null;
@@ -197,11 +218,15 @@ public class AquariumView extends JFrame {
                 FallingFeed feed = feedIterator.next();
 
                 DisplayFish eater = findFishTouchingFeed(feed);
+
                 if (eater != null) {
                     boolean success = AquariumManager.useFeed(feed.feedType, eater.entry);
 
                     if (success) {
-                        message = eater.entry.getFish().getName() + " 吃掉了「" + AquariumManager.getFeedName(feed.feedType) + "」，飽食度上升。";
+                        message = eater.entry.getFish().getName()
+                            + " 吃掉了「"
+                            + AquariumManager.getFeedName(feed.feedType)
+                            + "」，飽食度上升。";
                     } else {
                         message = "飼料庫存不足，請先購買。";
                     }
@@ -269,13 +294,16 @@ public class AquariumView extends JFrame {
                 fish.x = leftLimit;
                 fish.direction = 1;
             }
+
             if (fish.x > rightLimit) {
                 fish.x = rightLimit;
                 fish.direction = -1;
             }
+
             if (fish.y < topLimit) {
                 fish.y = topLimit;
             }
+
             if (fish.y > bottomLimit) {
                 fish.y = bottomLimit;
             }
@@ -298,6 +326,12 @@ public class AquariumView extends JFrame {
             super.paintComponent(g);
 
             Graphics2D g2 = (Graphics2D) g.create();
+
+            double scaleX = getWidth() / (double) SCREEN_WIDTH;
+            double scaleY = getHeight() / (double) SCREEN_HEIGHT;
+
+            g2.scale(scaleX, scaleY);
+
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -325,13 +359,21 @@ public class AquariumView extends JFrame {
 
         private void drawBackground(Graphics2D g2) {
             if (backgroundImg != null) {
-                g2.drawImage(backgroundImg, 0, 0, getWidth(), getHeight(), this);
+                g2.drawImage(backgroundImg, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, this);
                 return;
             }
 
-            GradientPaint bg = new GradientPaint(0, 0, new Color(6, 18, 30), 0, getHeight(), new Color(1, 5, 10));
+            GradientPaint bg = new GradientPaint(
+                0,
+                0,
+                new Color(6, 18, 30),
+                0,
+                SCREEN_HEIGHT,
+                new Color(1, 5, 10)
+            );
+
             g2.setPaint(bg);
-            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
             g2.setColor(new Color(30, 150, 190));
             g2.fillRoundRect(tankRect.x, tankRect.y, tankRect.width, tankRect.height, 40, 40);
@@ -353,6 +395,7 @@ public class AquariumView extends JFrame {
                 g2.fillOval((int) feed.x - 3, (int) feed.y + 6, 18, 7);
 
                 g2.setColor(color);
+
                 for (int i = 0; i < 5; i++) {
                     int px = (int) feed.x + (i * 5) % 13;
                     int py = (int) feed.y + (i * 7) % 15;
@@ -409,9 +452,31 @@ public class AquariumView extends JFrame {
                 Image img = icon.getImage();
 
                 if (dir > 0) {
-                    g2.drawImage(img, x, y, x + w, y + h, 0, 0, icon.getIconWidth(), icon.getIconHeight(), this);
+                    g2.drawImage(
+                        img,
+                        x,
+                        y,
+                        x + w,
+                        y + h,
+                        0,
+                        0,
+                        icon.getIconWidth(),
+                        icon.getIconHeight(),
+                        this
+                    );
                 } else {
-                    g2.drawImage(img, x + w, y, x, y + h, 0, 0, icon.getIconWidth(), icon.getIconHeight(), this);
+                    g2.drawImage(
+                        img,
+                        x + w,
+                        y,
+                        x,
+                        y + h,
+                        0,
+                        0,
+                        icon.getIconWidth(),
+                        icon.getIconHeight(),
+                        this
+                    );
                 }
             } else {
                 drawFallbackFish(g2, x, y, w, h, dir, fish.getName());
@@ -423,6 +488,7 @@ public class AquariumView extends JFrame {
             g2.fillOval(x, y + h / 4, w - 18, h / 2);
 
             Polygon tail = new Polygon();
+
             if (dir > 0) {
                 tail.addPoint(x - 8, y + h / 2);
                 tail.addPoint(x - 30, y + h / 4);
@@ -432,9 +498,11 @@ public class AquariumView extends JFrame {
                 tail.addPoint(x + w + 12, y + h / 4);
                 tail.addPoint(x + w + 12, y + h * 3 / 4);
             }
+
             g2.fillPolygon(tail);
 
             g2.setColor(Color.WHITE);
+
             if (dir > 0) {
                 g2.fillOval(x + w - 34, y + h / 2 - 7, 8, 8);
                 g2.setColor(Color.BLACK);
@@ -470,9 +538,23 @@ public class AquariumView extends JFrame {
                 );
 
                 if (visitor.image != null) {
-                    g2.drawImage(visitor.image, visitor.x + xOffset, visitor.y + yOffset, visitor.w, visitor.h, this);
+                    g2.drawImage(
+                        visitor.image,
+                        visitor.x + xOffset,
+                        visitor.y + yOffset,
+                        visitor.w,
+                        visitor.h,
+                        this
+                    );
                 } else {
-                    drawPixelVisitor(g2, visitor.x + xOffset, visitor.y + yOffset, visitor.w, visitor.h, visitor.phase);
+                    drawPixelVisitor(
+                        g2,
+                        visitor.x + xOffset,
+                        visitor.y + yOffset,
+                        visitor.w,
+                        visitor.h,
+                        visitor.phase
+                    );
                 }
             }
         }
@@ -498,7 +580,14 @@ public class AquariumView extends JFrame {
             int yOffset = (int) (Math.sin(tick * 0.05) * 2);
 
             if (guideImg != null) {
-                g2.drawImage(guideImg, guideRect.x, guideRect.y + yOffset, guideRect.width, guideRect.height, this);
+                g2.drawImage(
+                    guideImg,
+                    guideRect.x,
+                    guideRect.y + yOffset,
+                    guideRect.width,
+                    guideRect.height,
+                    this
+                );
             } else {
                 drawPixelGuide(g2, guideRect.x, guideRect.y + yOffset, guideRect.width, guideRect.height);
             }
@@ -506,7 +595,14 @@ public class AquariumView extends JFrame {
             if (guideHovered) {
                 g2.setColor(new Color(255, 230, 120, 95));
                 g2.setStroke(new BasicStroke(3));
-                g2.drawRoundRect(guideRect.x - 6, guideRect.y - 6, guideRect.width + 12, guideRect.height + 12, 18, 18);
+                g2.drawRoundRect(
+                    guideRect.x - 6,
+                    guideRect.y - 6,
+                    guideRect.width + 12,
+                    guideRect.height + 12,
+                    18,
+                    18
+                );
             }
         }
 
@@ -573,12 +669,27 @@ public class AquariumView extends JFrame {
             boolean hover = feedShopCloseRect.contains(mouse);
 
             g2.setColor(hover ? new Color(185, 70, 58) : new Color(115, 48, 40));
-            g2.fillOval(feedShopCloseRect.x, feedShopCloseRect.y, feedShopCloseRect.width, feedShopCloseRect.height);
+            g2.fillOval(
+                feedShopCloseRect.x,
+                feedShopCloseRect.y,
+                feedShopCloseRect.width,
+                feedShopCloseRect.height
+            );
 
             g2.setColor(new Color(255, 230, 170));
             g2.setStroke(new BasicStroke(3));
-            g2.drawLine(feedShopCloseRect.x + 8, feedShopCloseRect.y + 8, feedShopCloseRect.x + 20, feedShopCloseRect.y + 20);
-            g2.drawLine(feedShopCloseRect.x + 20, feedShopCloseRect.y + 8, feedShopCloseRect.x + 8, feedShopCloseRect.y + 20);
+            g2.drawLine(
+                feedShopCloseRect.x + 8,
+                feedShopCloseRect.y + 8,
+                feedShopCloseRect.x + 20,
+                feedShopCloseRect.y + 20
+            );
+            g2.drawLine(
+                feedShopCloseRect.x + 20,
+                feedShopCloseRect.y + 8,
+                feedShopCloseRect.x + 8,
+                feedShopCloseRect.y + 20
+            );
         }
 
         private void drawActionButton(Graphics2D g2, Rectangle rect, String text, Color top, Color bottom) {
@@ -598,18 +709,22 @@ public class AquariumView extends JFrame {
 
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 19));
             g2.setColor(new Color(255, 235, 170));
+
             FontMetrics fm = g2.getFontMetrics();
             int tx = rect.x + rect.width / 2 - fm.stringWidth(text) / 2;
             int ty = rect.y + rect.height / 2 + fm.getAscent() / 2 - 4;
+
             g2.drawString(text, tx, ty);
         }
 
         private Point getMousePositionSafe() {
             Point p = getMousePosition();
+
             if (p == null) {
                 return new Point(-9999, -9999);
             }
-            return p;
+
+            return toGamePoint(p);
         }
 
         private void drawFeedButton(Graphics2D g2, FeedButton button) {
@@ -649,13 +764,22 @@ public class AquariumView extends JFrame {
             g2.setColor(new Color(0, 0, 0, 90));
             g2.fillOval(x - 2, y + 36, 34, 8);
 
-            g2.setPaint(new GradientPaint(x, y, new Color(110, 160, 170), x, y + 40, new Color(36, 62, 70)));
+            g2.setPaint(new GradientPaint(
+                x,
+                y,
+                new Color(110, 160, 170),
+                x,
+                y + 40,
+                new Color(36, 62, 70)
+            ));
+
             g2.fillRoundRect(x, y, 30, 42, 9, 9);
 
             g2.setColor(new Color(225, 185, 95));
             g2.fillRoundRect(x + 2, y - 5, 26, 10, 5, 5);
 
             g2.setColor(feedColor);
+
             for (int i = 0; i < 12; i++) {
                 int px = x + 6 + (i * 7) % 18;
                 int py = y + 14 + (i * 5) % 22;
@@ -727,7 +851,12 @@ public class AquariumView extends JFrame {
             g2.setColor(new Color(20, 28, 32));
             g2.fillRoundRect(barX, barY, barW, barH, 10, 10);
 
-            Color fullnessColor = fullness >= 70 ? new Color(85, 220, 120) : fullness >= 35 ? new Color(230, 170, 50) : new Color(235, 70, 60);
+            Color fullnessColor = fullness >= 70
+                ? new Color(85, 220, 120)
+                : fullness >= 35
+                    ? new Color(230, 170, 50)
+                    : new Color(235, 70, 60);
+
             g2.setColor(fullnessColor);
             g2.fillRoundRect(barX, barY, (int) (barW * fullness / 100.0), barH, 10, 10);
 
@@ -766,6 +895,7 @@ public class AquariumView extends JFrame {
                 "飽食度越高，魚的被動收入越穩定。",
                 "餵食後飼料會掉進水裡，魚會自己去吃。"
             };
+
             return lines[(tick / 120) % lines.length];
         }
 
@@ -783,7 +913,15 @@ public class AquariumView extends JFrame {
             g2.setColor(new Color(0, 0, 0, 145));
             g2.fillRoundRect(x + 7, y + 7, w, h, 18, 18);
 
-            g2.setPaint(new GradientPaint(x, y, new Color(12, 46, 60, 232), x, y + h, new Color(4, 18, 30, 232)));
+            g2.setPaint(new GradientPaint(
+                x,
+                y,
+                new Color(12, 46, 60, 232),
+                x,
+                y + h,
+                new Color(4, 18, 30, 232)
+            ));
+
             g2.fillRoundRect(x, y, w, h, 18, 18);
 
             g2.setColor(new Color(210, 145, 58));
@@ -796,19 +934,21 @@ public class AquariumView extends JFrame {
 
         @Override
         public void mouseMoved(MouseEvent e) {
+            Point p = toGamePoint(e.getPoint());
+
             hoveredFish = null;
-            guideHovered = guideRect.contains(e.getPoint());
+            guideHovered = guideRect.contains(p);
 
             for (FeedButton button : feedButtons) {
                 if (feedShopVisible) {
-                    button.hover = button.getRect().contains(e.getPoint());
+                    button.hover = button.getRect().contains(p);
                 } else {
                     button.hover = false;
                 }
             }
 
             for (DisplayFish fish : displayFishList) {
-                if (fish.getBounds().contains(e.getPoint())) {
+                if (fish.getBounds().contains(p)) {
                     hoveredFish = fish;
                     break;
                 }
@@ -823,10 +963,15 @@ public class AquariumView extends JFrame {
 
         @Override
         public void mouseClicked(MouseEvent e) {
-            Point p = e.getPoint();
+            Point p = toGamePoint(e.getPoint());
 
             if (exitButtonRect.contains(p)) {
-                dispose();
+                stopAnimation();
+
+                if (backToLandAction != null) {
+                    backToLandAction.actionPerformed(null);
+                }
+
                 return;
             }
 
@@ -844,7 +989,12 @@ public class AquariumView extends JFrame {
             }
 
             for (VisitorNpc visitor : visitors) {
-                Rectangle visitorRect = new Rectangle(visitor.x - 10, visitor.y - 10, visitor.w + 20, visitor.h + 20);
+                Rectangle visitorRect = new Rectangle(
+                    visitor.x - 10,
+                    visitor.y - 10,
+                    visitor.w + 20,
+                    visitor.h + 20
+                );
 
                 if (visitorRect.contains(p)) {
                     feedShopVisible = true;
@@ -879,6 +1029,7 @@ public class AquariumView extends JFrame {
                 } else {
                     message = "金幣不足，無法購買「" + AquariumManager.getFeedName(selectedFeedType) + "」。";
                 }
+
                 repaint();
                 return;
             }
@@ -890,7 +1041,8 @@ public class AquariumView extends JFrame {
         }
 
         private void openAquariumNpcDialog() {
-            AquariumNpcDialog dialog = new AquariumNpcDialog(AquariumView.this, this);
+            Window owner = SwingUtilities.getWindowAncestor(AquariumView.this);
+            AquariumNpcDialog dialog = new AquariumNpcDialog(owner, this);
             dialog.setVisible(true);
         }
 
@@ -924,23 +1076,31 @@ public class AquariumView extends JFrame {
 
         private int countFallingFeed(String feedType) {
             int count = 0;
+
             for (FallingFeed feed : fallingFeeds) {
                 if (feed.feedType.equals(feedType)) {
                     count++;
                 }
             }
+
             return count;
         }
 
         @Override public void mousePressed(MouseEvent e) {}
         @Override public void mouseReleased(MouseEvent e) {}
-        @Override public void mouseEntered(MouseEvent e) {}
+        @Override public void mouseEntered(MouseEvent e) {
+            requestFocusInWindow();
+        }
         @Override public void mouseExited(MouseEvent e) {}
 
         @Override
         public void keyPressed(KeyEvent e) {
             if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-                dispose();
+                stopAnimation();
+
+                if (backToLandAction != null) {
+                    backToLandAction.actionPerformed(null);
+                }
             }
         }
 
@@ -955,8 +1115,9 @@ public class AquariumView extends JFrame {
         private JList<Fish> fishList;
         private JLabel statusLabel;
 
-        public AquariumNpcDialog(JFrame owner, AquariumPanel aquariumPanel) {
-            super(owner, "導覽員 - 魚隻管理", true);
+        public AquariumNpcDialog(Window owner, AquariumPanel aquariumPanel) {
+            super(owner, "導覽員 - 魚隻管理", Dialog.ModalityType.APPLICATION_MODAL);
+
             this.aquariumPanel = aquariumPanel;
 
             setSize(620, 500);
@@ -1158,8 +1319,21 @@ public class AquariumView extends JFrame {
                 nameLabel.setText(fish.getName());
                 nameLabel.setForeground(new Color(255, 230, 150));
 
-                int incomePreview = Math.max(3, fish.getPrice() / 25 + Math.max(1, fish.getRarityStars()) * 4);
-                infoLabel.setText("價格：$" + fish.getPrice() + "　稀有度：" + buildStars(fish.getRarityStars()) + "　預估收入：$" + incomePreview + "/分");
+                int incomePreview = Math.max(
+                    3,
+                    fish.getPrice() / 25 + Math.max(1, fish.getRarityStars()) * 4
+                );
+
+                infoLabel.setText(
+                    "價格：$"
+                    + fish.getPrice()
+                    + "　稀有度："
+                    + buildStars(fish.getRarityStars())
+                    + "　預估收入：$"
+                    + incomePreview
+                    + "/分"
+                );
+
                 infoLabel.setForeground(new Color(205, 230, 235));
 
                 return this;

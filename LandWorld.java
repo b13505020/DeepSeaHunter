@@ -26,7 +26,6 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private final int WORLD_WIDTH = 1600;
     private final int WORLD_HEIGHT = 900;
 
-    // 左上 Mechanical Market / 裝備升級商店範圍
     private Rectangle[] shopZones = {
         new Rectangle(0, 230, 240, 270),
         new Rectangle(180, 240, 220, 260),
@@ -34,26 +33,21 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         new Rectangle(250, 260, 150, 230)
     };
 
-    // 中間 Blacksmith / 武器商店範圍
     private Rectangle[] weaponShopZones = {
         new Rectangle(390, 205, 210, 285),
         new Rectangle(325, 300, 210, 210)
     };
 
-    // Headquarters / 任務大廳範圍
     private Rectangle[] headquartersZones = {
         new Rectangle(720, 150, 240, 390),
         new Rectangle(930, 360, 180, 140)
     };
 
-    // 左下 Aquarium / 水族館範圍
     private Rectangle aquariumZone = new Rectangle(45, 505, 355, 265);
 
-    // 右下 Dive Zone / 下潛區
     private Rectangle diveZone = new Rectangle(1080, 585, 295, 275);
 
-    // 右側 Coast / 沙灘入口範圍
-    private Rectangle beachZone = new Rectangle(1320, 500, 260, 360);
+    private Rectangle beachZone = new Rectangle(620, 680, 380, 210);
 
     private ActionListener onDive;
     private ActionListener onEnterShop;
@@ -61,6 +55,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private ActionListener onEnterBeach;
     private ActionListener onEnterWeaponShop;
     private ActionListener onEnterAquarium;
+    private ActionListener onBackToTitle;
 
     public LandWorld(
         ActionListener onDive,
@@ -68,7 +63,8 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         ActionListener onEnterHeadquarters,
         ActionListener onEnterBeach,
         ActionListener onEnterWeaponShop,
-        ActionListener onEnterAquarium
+        ActionListener onEnterAquarium,
+        ActionListener onBackToTitle
     ) {
         this.onDive = onDive;
         this.onEnterShop = onEnterShop;
@@ -76,9 +72,11 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         this.onEnterBeach = onEnterBeach;
         this.onEnterWeaponShop = onEnterWeaponShop;
         this.onEnterAquarium = onEnterAquarium;
+        this.onBackToTitle = onBackToTitle;
 
         setLayout(null);
         setFocusable(true);
+        setPreferredSize(new Dimension(WORLD_WIDTH, WORLD_HEIGHT));
         addKeyListener(this);
 
         loadImages();
@@ -109,6 +107,25 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         });
 
         add(storageBtn);
+
+        JButton menuBtn = new JButton("Menu 選單");
+        menuBtn.setBounds(180, 30, 120, 40);
+        menuBtn.setFocusable(false);
+
+        menuBtn.addActionListener(e -> {
+            left = false;
+            right = false;
+            up = false;
+            down = false;
+
+            InventoryManager.saveGame();
+
+            if (onBackToTitle != null) {
+                onBackToTitle.actionPerformed(null);
+            }
+        });
+
+        add(menuBtn);
     }
 
     public void resetPlayerPosition() {
@@ -187,6 +204,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -202,19 +220,36 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         return isInAnyZone(playerRect, headquartersZones);
     }
 
+    private boolean isInAquariumZone(Rectangle playerRect) {
+        return playerRect.intersects(aquariumZone);
+    }
+
+    private boolean isInBeachZone(Rectangle playerRect) {
+        return playerRect.intersects(beachZone);
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
+        Graphics2D g2 = (Graphics2D) g.create();
+
+        double scaleX = getWidth() / (double) WORLD_WIDTH;
+        double scaleY = getHeight() / (double) WORLD_HEIGHT;
+
+        g2.scale(scaleX, scaleY);
+
         if (background != null) {
-            g.drawImage(background, 0, 0, WORLD_WIDTH, WORLD_HEIGHT, this);
+            g2.drawImage(background, 0, 0, WORLD_WIDTH, WORLD_HEIGHT, this);
         } else {
-            g.setColor(new Color(35, 35, 45));
-            g.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+            g2.setColor(new Color(35, 35, 45));
+            g2.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
         }
 
-        drawPlayer(g);
-        drawInteractionPrompt(g);
+        drawPlayer(g2);
+        drawInteractionPrompt(g2);
+
+        g2.dispose();
     }
 
     private void drawPlayer(Graphics g) {
@@ -270,7 +305,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
             prompt = "Press ENTER to Shop";
         } else if (pRect.intersects(diveZone)) {
             prompt = "Press ENTER to Dive";
-        } else if (pRect.intersects(beachZone)) {
+        } else if (isInBeachZone(pRect)) {
             prompt = "Press ENTER to Beach";
         }
 
@@ -293,10 +328,6 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         g2.drawString(prompt, textX, textY);
 
         g2.dispose();
-    }
-
-    private boolean isInAquariumZone(Rectangle playerRect) {
-        return playerRect.intersects(aquariumZone);
     }
 
     @Override
@@ -337,7 +368,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
             onEnterShop.actionPerformed(null);
         } else if (pRect.intersects(diveZone)) {
             onDive.actionPerformed(null);
-        } else if (pRect.intersects(beachZone)) {
+        } else if (isInBeachZone(pRect)) {
             onEnterBeach.actionPerformed(null);
         }
     }

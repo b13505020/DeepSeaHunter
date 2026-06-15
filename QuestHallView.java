@@ -7,17 +7,23 @@ import java.util.Comparator;
 import java.util.List;
 import javax.imageio.ImageIO;
 
-public class QuestHallView extends JFrame {
+public class QuestHallView extends JPanel {
 
-    public QuestHallView() {
-        setTitle("Mission Hall - 任務大廳");
-        setSize(1600, 900);
-        setLocationRelativeTo(null);
-        setResizable(false);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+    public static final int SCREEN_WIDTH = 1600;
+    public static final int SCREEN_HEIGHT = 900;
 
-        add(new QuestHallPanel());
-        setVisible(true);
+    private ActionListener backToLandAction;
+    private QuestHallPanel questHallPanel;
+
+    public QuestHallView(ActionListener backToLandAction) {
+        this.backToLandAction = backToLandAction;
+
+        setLayout(new BorderLayout());
+        setFocusable(true);
+        setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
+
+        questHallPanel = new QuestHallPanel();
+        add(questHallPanel, BorderLayout.CENTER);
     }
 
     class QuestHallPanel extends JPanel implements KeyListener, MouseListener, MouseMotionListener {
@@ -29,7 +35,6 @@ public class QuestHallView extends JFrame {
         private Timer timer;
         private int tick = 0;
 
-        // 這三個 Rectangle 只是「隱形點擊區」，不會畫出框框。
         private Rectangle tavernRect = new Rectangle(35, 140, 310, 455);
         private Rectangle captainRect = new Rectangle(675, 342, 250, 292);
         private Rectangle missionBoardRect = new Rectangle(1165, 135, 390, 480);
@@ -59,9 +64,47 @@ public class QuestHallView extends JFrame {
                 MissionBoardView.autoCheckMissionProgress();
                 repaint();
             });
+
             timer.start();
 
             SwingUtilities.invokeLater(() -> requestFocusInWindow());
+        }
+
+        private double getScaleX() {
+            if (getWidth() <= 0) {
+                return 1.0;
+            }
+
+            return getWidth() / (double) SCREEN_WIDTH;
+        }
+
+        private double getScaleY() {
+            if (getHeight() <= 0) {
+                return 1.0;
+            }
+
+            return getHeight() / (double) SCREEN_HEIGHT;
+        }
+
+        private Point toGamePoint(Point p) {
+            if (p == null) {
+                return new Point(-9999, -9999);
+            }
+
+            return new Point(
+                (int) (p.x / getScaleX()),
+                (int) (p.y / getScaleY())
+            );
+        }
+
+        private Point getMousePositionGameSafe() {
+            Point p = getMousePosition();
+
+            if (p == null) {
+                return new Point(-9999, -9999);
+            }
+
+            return toGamePoint(p);
         }
 
         private void loadImages() {
@@ -69,6 +112,7 @@ public class QuestHallView extends JFrame {
             captainImg = loadImage("assets/mission_captain.png");
 
             npcImages = new Image[24];
+
             for (int i = 0; i < npcImages.length; i++) {
                 npcImages[i] = loadImage("assets/mission_npc_" + i + ".png");
             }
@@ -77,9 +121,11 @@ public class QuestHallView extends JFrame {
         private Image loadImage(String path) {
             try {
                 File file = new File(path);
+
                 if (!file.exists()) {
                     return null;
                 }
+
                 return ImageIO.read(file);
             } catch (Exception e) {
                 return null;
@@ -89,8 +135,6 @@ public class QuestHallView extends JFrame {
         private void createNpcs() {
             npcs.clear();
 
-            // 修正版：只使用完整身體的 NPC 素材，不再使用切到半身的走路展示圖。
-            // 中間任務官不動，只修正路人 NPC。
             npcs.add(new HallNpc(0, 345, 646, 52, 78, 0, 0.24, 300, 455, "酒館那邊很熱鬧。"));
             npcs.add(new HallNpc(1, 455, 715, 54, 80, 35, -0.22, 390, 555, "先接任務再下海。"));
             npcs.add(new HallNpc(10, 555, 615, 50, 76, 70, 0.2, 510, 650, "完成任務會有獎金。"));
@@ -120,6 +164,7 @@ public class QuestHallView extends JFrame {
                 npc.walkFrame = (tick / 12 + npc.phase) % 4;
 
                 npc.talkTimer--;
+
                 if (npc.talkTimer <= 0) {
                     npc.showBubble = !npc.showBubble;
                     npc.talkTimer = 170 + (npc.phase % 150);
@@ -132,18 +177,23 @@ public class QuestHallView extends JFrame {
             super.paintComponent(g);
 
             Graphics2D g2 = (Graphics2D) g.create();
+
+            double scaleX = getScaleX();
+            double scaleY = getScaleY();
+
+            g2.scale(scaleX, scaleY);
+
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
             drawBackground(g2);
-            // 依照 y 座標排序，讓靠下的 NPC 畫在前面，空間感比較自然。
+
             List<HallNpc> sorted = new ArrayList<>(npcs);
             sorted.sort(Comparator.comparingDouble(npc -> npc.y));
             drawMovingNpcs(g2, sorted);
 
             drawCaptain(g2);
-            drawHighlights(g2);
             drawCaptainSpeech(g2);
             drawBottomPrompt(g2);
             drawCloseButton(g2);
@@ -154,16 +204,12 @@ public class QuestHallView extends JFrame {
 
         private void drawBackground(Graphics2D g2) {
             if (backgroundImg != null) {
-                g2.drawImage(backgroundImg, 0, 0, getWidth(), getHeight(), this);
+                g2.drawImage(backgroundImg, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, this);
                 return;
             }
 
             g2.setColor(new Color(8, 18, 28));
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-
-        private void drawHighlights(Graphics2D g2) {
-            // 不畫任何額外灰框或標籤；只保留底圖本身與隱形點擊區。
+            g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         }
 
         private void drawCaptain(Graphics2D g2) {
@@ -206,7 +252,7 @@ public class QuestHallView extends JFrame {
                 "點右側任務公告板，就能打開任務清單。",
                 "接了任務之後，只要條件達成就會自動完成。",
                 "完成任務會自動發放金幣。",
-                "左側酒館入口之後可以做成情報與支線任務區。"
+                "左側酒館入口可以做情報與補給任務區。"
             };
 
             return lines[(tick / 150) % lines.length];
@@ -232,6 +278,7 @@ public class QuestHallView extends JFrame {
             g2.fillOval(x + 6, y + npc.h - 8, npc.w - 12, 10);
 
             Image img = null;
+
             if (npcImages != null && npc.imageIndex >= 0 && npc.imageIndex < npcImages.length) {
                 img = npcImages[npc.imageIndex];
             }
@@ -247,7 +294,6 @@ public class QuestHallView extends JFrame {
             }
         }
 
-
         private boolean shouldUseFallbackNpcImage(Image img) {
             if (img == null) {
                 return true;
@@ -260,12 +306,12 @@ public class QuestHallView extends JFrame {
                 return true;
             }
 
-            // 如果圖片太扁，通常代表是半身或切壞的素材。
             return ih < iw * 1.2;
         }
 
         private void drawFallbackFullBodyNpc(Graphics2D g2, int x, int y, int w, int h, int phase) {
             Color coat;
+
             if (phase % 4 == 0) {
                 coat = new Color(40, 85, 105);
             } else if (phase % 4 == 1) {
@@ -281,29 +327,23 @@ public class QuestHallView extends JFrame {
 
             int cx = x + w / 2;
 
-            // 頭
             g2.setColor(skin);
             g2.fillOval(cx - w / 5, y + 6, w * 2 / 5, h / 4);
 
-            // 頭髮
             g2.setColor(hair);
             g2.fillArc(cx - w / 5 - 2, y + 3, w * 2 / 5 + 4, h / 5, 0, 180);
 
-            // 身體
             g2.setColor(coat);
             g2.fillRoundRect(cx - w / 4, y + h / 3, w / 2, h / 3, 10, 10);
 
-            // 手
             g2.setColor(skin);
             g2.fillRoundRect(cx - w / 3, y + h / 3 + 5, w / 8, h / 4, 8, 8);
             g2.fillRoundRect(cx + w / 4, y + h / 3 + 5, w / 8, h / 4, 8, 8);
 
-            // 腿
             g2.setColor(new Color(35, 35, 42));
             g2.fillRoundRect(cx - w / 5, y + h * 2 / 3, w / 7, h / 4, 6, 6);
             g2.fillRoundRect(cx + w / 18, y + h * 2 / 3, w / 7, h / 4, 6, 6);
 
-            // 腳
             g2.setColor(new Color(25, 22, 20));
             g2.fillRoundRect(cx - w / 5 - 2, y + h - 8, w / 5, 6, 5, 5);
             g2.fillRoundRect(cx + w / 18 - 2, y + h - 8, w / 5, 6, 5, 5);
@@ -327,18 +367,10 @@ public class QuestHallView extends JFrame {
 
         private void drawBottomPrompt(Graphics2D g2) {
             drawPanel(g2, 480, 762, 640, 70);
+
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
             g2.setColor(new Color(255, 230, 160));
-
-            if (tavernHovered) {
-                g2.drawString("點左側酒館區域｜點右側任務板區域｜ESC 離開", 555, 805);
-            } else if (boardHovered) {
-                g2.drawString("點左側酒館區域｜點右側任務板區域｜ESC 離開", 555, 805);
-            } else if (nearCaptain) {
-                g2.drawString("點左側酒館區域｜點右側任務板區域｜ESC 離開", 555, 805);
-            } else {
-                g2.drawString("點左側酒館區域｜點右側任務板區域｜ESC 離開", 555, 805);
-            }
+            g2.drawString("點左側酒館區域｜點右側任務板區域｜ESC 離開", 555, 805);
         }
 
         private void drawCloseButton(Graphics2D g2) {
@@ -355,7 +387,15 @@ public class QuestHallView extends JFrame {
             g2.setColor(new Color(0, 0, 0, 145));
             g2.fillRoundRect(x + 7, y + 7, w, h, 20, 20);
 
-            g2.setPaint(new GradientPaint(x, y, new Color(12, 46, 60, 232), x, y + h, new Color(4, 18, 30, 232)));
+            g2.setPaint(new GradientPaint(
+                x,
+                y,
+                new Color(12, 46, 60, 232),
+                x,
+                y + h,
+                new Color(4, 18, 30, 232)
+            ));
+
             g2.fillRoundRect(x, y, w, h, 20, 20);
 
             g2.setColor(new Color(210, 145, 58));
@@ -364,7 +404,7 @@ public class QuestHallView extends JFrame {
         }
 
         private void drawButton(Graphics2D g2, Rectangle rect, String text) {
-            Point mouse = getMousePosition();
+            Point mouse = getMousePositionGameSafe();
             boolean hover = mouse != null && rect.contains(mouse);
 
             g2.setPaint(new GradientPaint(
@@ -384,15 +424,18 @@ public class QuestHallView extends JFrame {
 
             g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
             g2.setColor(new Color(255, 235, 170));
+
             FontMetrics fm = g2.getFontMetrics();
             int tx = rect.x + rect.width / 2 - fm.stringWidth(text) / 2;
             int ty = rect.y + rect.height / 2 + fm.getAscent() / 2 - 4;
+
             g2.drawString(text, tx, ty);
         }
 
         @Override
         public void mouseMoved(MouseEvent e) {
-            Point p = e.getPoint();
+            Point p = toGamePoint(e.getPoint());
+
             tavernHovered = tavernRect.contains(p);
             nearCaptain = captainRect.contains(p);
             boardHovered = missionBoardRect.contains(p);
@@ -408,10 +451,12 @@ public class QuestHallView extends JFrame {
 
         @Override
         public void mouseClicked(MouseEvent e) {
-            Point p = e.getPoint();
+            Point p = toGamePoint(e.getPoint());
 
             if (closeRect.contains(p)) {
-                dispose();
+                if (backToLandAction != null) {
+                    backToLandAction.actionPerformed(null);
+                }
                 return;
             }
 
@@ -442,16 +487,22 @@ public class QuestHallView extends JFrame {
             }
 
             if (windowClass == TavernView.class) {
-                new TavernView();
+                TavernView tavern = new TavernView();
+                tavern.toFront();
+                tavern.requestFocus();
             } else if (windowClass == MissionBoardView.class) {
-                new MissionBoardView();
+                MissionBoardView board = new MissionBoardView();
+                board.toFront();
+                board.requestFocus();
             }
         }
 
         @Override
         public void keyPressed(KeyEvent e) {
             if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-                dispose();
+                if (backToLandAction != null) {
+                    backToLandAction.actionPerformed(null);
+                }
                 return;
             }
 
@@ -479,9 +530,13 @@ public class QuestHallView extends JFrame {
         }
 
         @Override public void mouseDragged(MouseEvent e) {}
-        @Override public void mousePressed(MouseEvent e) {}
+        @Override public void mousePressed(MouseEvent e) {
+            requestFocusInWindow();
+        }
         @Override public void mouseReleased(MouseEvent e) {}
-        @Override public void mouseEntered(MouseEvent e) {}
+        @Override public void mouseEntered(MouseEvent e) {
+            requestFocusInWindow();
+        }
         @Override public void mouseExited(MouseEvent e) {}
         @Override public void keyReleased(KeyEvent e) {}
         @Override public void keyTyped(KeyEvent e) {}
@@ -503,7 +558,18 @@ public class QuestHallView extends JFrame {
         boolean showBubble = false;
         int talkTimer;
 
-        public HallNpc(int imageIndex, double x, double y, int w, int h, int phase, double vx, double minX, double maxX, String line) {
+        public HallNpc(
+            int imageIndex,
+            double x,
+            double y,
+            int w,
+            int h,
+            int phase,
+            double vx,
+            double minX,
+            double maxX,
+            String line
+        ) {
             this.imageIndex = imageIndex;
             this.x = x;
             this.y = y;

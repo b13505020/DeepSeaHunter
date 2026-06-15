@@ -8,13 +8,15 @@ import java.util.Random;
 import javax.imageio.ImageIO;
 
 public class GearShopScreen extends JPanel {
+    public static final int SCREEN_WIDTH = 1600;
+    public static final int SCREEN_HEIGHT = 900;
+
     private BufferedImage shopBg;
     private BufferedImage bossImage;
 
     private JLabel moneyLabel;
     private JLabel infoLabel;
 
-    // 下面對話框文字區
     private JTextArea messageArea;
 
     private JButton suitBtn;
@@ -23,9 +25,6 @@ public class GearShopScreen extends JPanel {
     private JButton sellFishBtn;
     private JButton exitBtn;
 
-    // =========================
-    // 商店老闆相關
-    // =========================
     private JButton bossBtn;
 
     private int bossX = 590;
@@ -34,16 +33,12 @@ public class GearShopScreen extends JPanel {
     private final int BOSS_WIDTH = 170;
     private final int BOSS_HEIGHT = 270;
 
-    // 老闆左右移動範圍
     private final int bossMinX = 555;
     private final int bossMaxX = 700;
 
     private int bossDirection = 1;
     private final int bossSpeed = 1;
 
-    // 這個數字越小，老闆被櫃檯遮住越多
-    // 如果你覺得還是露太多，就改成 520 或 510
-    // 如果你覺得被切太多，就改成 550 或 560
     private final int BOSS_CUT_Y = 570;
 
     private Timer bossMoveTimer;
@@ -63,7 +58,7 @@ public class GearShopScreen extends JPanel {
 
     public GearShopScreen(ActionListener backToLandAction) {
         setLayout(null);
-        setPreferredSize(new Dimension(1600, 900));
+        setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         setFocusable(true);
 
         loadImages();
@@ -74,7 +69,106 @@ public class GearShopScreen extends JPanel {
         setupBossButton();
         setupBossMovement();
 
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                layoutComponentsForFullscreen();
+            }
+        });
+
         setBottomMessage("點選商店中的設備區域進行升級。");
+
+        SwingUtilities.invokeLater(() -> layoutComponentsForFullscreen());
+    }
+
+    private double getScaleX() {
+        if (getWidth() <= 0) {
+            return 1.0;
+        }
+
+        return getWidth() / (double) SCREEN_WIDTH;
+    }
+
+    private double getScaleY() {
+        if (getHeight() <= 0) {
+            return 1.0;
+        }
+
+        return getHeight() / (double) SCREEN_HEIGHT;
+    }
+
+    private double getFontScale() {
+        return Math.min(getScaleX(), getScaleY());
+    }
+
+    private int sx(int value) {
+        return (int) Math.round(value * getScaleX());
+    }
+
+    private int sy(int value) {
+        return (int) Math.round(value * getScaleY());
+    }
+
+    private int sw(int value) {
+        return (int) Math.round(value * getScaleX());
+    }
+
+    private int sh(int value) {
+        return (int) Math.round(value * getScaleY());
+    }
+
+    private Font scaledFont(String name, int style, int size) {
+        int scaledSize = Math.max(12, (int) Math.round(size * getFontScale()));
+        return new Font(name, style, scaledSize);
+    }
+
+    private void setGameBounds(Component component, int x, int y, int w, int h) {
+        component.setBounds(sx(x), sy(y), sw(w), sh(h));
+    }
+
+    private void layoutComponentsForFullscreen() {
+        if (moneyLabel != null) {
+            setGameBounds(moneyLabel, 40, 25, 500, 40);
+            moneyLabel.setFont(scaledFont("Microsoft JhengHei", Font.BOLD, 24));
+        }
+
+        if (infoLabel != null) {
+            setGameBounds(infoLabel, 40, 65, 1250, 35);
+            infoLabel.setFont(scaledFont("Microsoft JhengHei", Font.BOLD, 18));
+        }
+
+        if (messageArea != null) {
+            setGameBounds(messageArea, 45, 805, 1180, 45);
+            messageArea.setFont(scaledFont("Microsoft JhengHei", Font.BOLD, 22));
+        }
+
+        if (suitBtn != null) {
+            setGameBounds(suitBtn, 80, 145, 430, 430);
+        }
+
+        if (oxygenBtn != null) {
+            setGameBounds(oxygenBtn, 1010, 145, 290, 430);
+        }
+
+        if (backpackBtn != null) {
+            setGameBounds(backpackBtn, 1300, 150, 260, 500);
+        }
+
+        if (sellFishBtn != null) {
+            setGameBounds(sellFishBtn, 820, 430, 170, 160);
+        }
+
+        if (exitBtn != null) {
+            setGameBounds(exitBtn, 1360, 790, 180, 55);
+            exitBtn.setFont(scaledFont("Microsoft JhengHei", Font.BOLD, 20));
+        }
+
+        if (bossBtn != null) {
+            setGameBounds(bossBtn, bossX, bossY, BOSS_WIDTH, getBossVisibleHeight());
+        }
+
+        revalidate();
+        repaint();
     }
 
     private void loadImages() {
@@ -87,16 +181,12 @@ public class GearShopScreen extends JPanel {
 
         try {
             bossImage = ImageIO.read(new File("assets/shop_boss.png"));
-
-            // 如果圖片還有白色或淺灰背景，這裡會幫你轉透明
             bossImage = removeLightBackground(bossImage);
-
         } catch (IOException e) {
             System.out.println("❌ 找不到 assets/shop_boss.png，將使用替代方塊顯示老闆");
         }
     }
 
-    // 把白色 / 淺灰色背景轉透明
     private BufferedImage removeLightBackground(BufferedImage src) {
         BufferedImage result = new BufferedImage(
             src.getWidth(),
@@ -141,22 +231,16 @@ public class GearShopScreen extends JPanel {
 
     private void setupInfoLabels() {
         moneyLabel = new JLabel();
-        moneyLabel.setBounds(40, 25, 500, 40);
-        moneyLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
         moneyLabel.setForeground(new Color(255, 230, 160));
         add(moneyLabel);
 
         infoLabel = new JLabel();
-        infoLabel.setBounds(40, 65, 1250, 35);
-        infoLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
         infoLabel.setForeground(new Color(180, 240, 255));
         add(infoLabel);
     }
 
     private void setupMessageArea() {
         messageArea = new JTextArea();
-        messageArea.setBounds(45, 805, 1180, 45);
-        messageArea.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
         messageArea.setForeground(Color.WHITE);
         messageArea.setOpaque(false);
         messageArea.setEditable(false);
@@ -171,14 +255,7 @@ public class GearShopScreen extends JPanel {
     }
 
     private void setupHotspotButtons(ActionListener backToLandAction) {
-        // 左側：潛水衣升級區
-        suitBtn = createHotspotButton(
-            "升級潛水衣：增加最大下潛深度",
-            80,
-            145,
-            430,
-            430
-        );
+        suitBtn = createHotspotButton("升級潛水衣：增加最大下潛深度");
 
         suitBtn.addActionListener(e -> {
             boolean success = InventoryManager.upgradeSuit();
@@ -194,14 +271,7 @@ public class GearShopScreen extends JPanel {
 
         add(suitBtn);
 
-        // 右中：氧氣瓶升級區
-        oxygenBtn = createHotspotButton(
-            "升級氧氣瓶：增加下水時間",
-            1010,
-            145,
-            290,
-            430
-        );
+        oxygenBtn = createHotspotButton("升級氧氣瓶：增加下水時間");
 
         oxygenBtn.addActionListener(e -> {
             boolean success = InventoryManager.upgradeOxygen();
@@ -217,14 +287,7 @@ public class GearShopScreen extends JPanel {
 
         add(oxygenBtn);
 
-        // 最右：背包升級區
-        backpackBtn = createHotspotButton(
-            "升級背包：增加可攜帶魚的數量",
-            1300,
-            150,
-            260,
-            500
-        );
+        backpackBtn = createHotspotButton("升級背包：增加可攜帶魚的數量");
 
         backpackBtn.addActionListener(e -> {
             boolean success = InventoryManager.upgradeBackpack();
@@ -240,14 +303,7 @@ public class GearShopScreen extends JPanel {
 
         add(backpackBtn);
 
-        // 中間桌上的電腦 / 結算機：賣魚
-        sellFishBtn = createHotspotButton(
-            "打開賣魚介面",
-            820,
-            430,
-            170,
-            160
-        );
+        sellFishBtn = createHotspotButton("打開賣魚介面");
 
         sellFishBtn.addActionListener(e -> {
             new SellFishView(() -> {
@@ -259,10 +315,7 @@ public class GearShopScreen extends JPanel {
 
         add(sellFishBtn);
 
-        // 離開商店按鈕
         exitBtn = new JButton("返回陸地");
-        exitBtn.setBounds(1360, 790, 180, 55);
-        exitBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
         exitBtn.setForeground(Color.WHITE);
         exitBtn.setBackground(new Color(45, 35, 25));
         exitBtn.setBorder(BorderFactory.createLineBorder(new Color(220, 170, 80), 3));
@@ -271,10 +324,9 @@ public class GearShopScreen extends JPanel {
         add(exitBtn);
     }
 
-    private JButton createHotspotButton(String tooltip, int x, int y, int w, int h) {
+    private JButton createHotspotButton(String tooltip) {
         JButton btn = new JButton();
 
-        btn.setBounds(x, y, w, h);
         btn.setToolTipText(tooltip);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
@@ -300,18 +352,8 @@ public class GearShopScreen extends JPanel {
         return btn;
     }
 
-    // =========================
-    // 商店老闆設定
-    // =========================
     private void setupBossButton() {
         bossBtn = new JButton();
-
-        bossBtn.setBounds(
-            bossX,
-            bossY,
-            BOSS_WIDTH,
-            getBossVisibleHeight()
-        );
 
         bossBtn.setContentAreaFilled(false);
         bossBtn.setBorderPainted(false);
@@ -354,12 +396,7 @@ public class GearShopScreen extends JPanel {
             }
 
             if (bossBtn != null) {
-                bossBtn.setBounds(
-                    bossX,
-                    bossY,
-                    BOSS_WIDTH,
-                    getBossVisibleHeight()
-                );
+                setGameBounds(bossBtn, bossX, bossY, BOSS_WIDTH, getBossVisibleHeight());
             }
 
             repaint();
@@ -395,26 +432,25 @@ public class GearShopScreen extends JPanel {
         requestFocusInWindow();
     }
 
-    private void drawBoss(Graphics g) {
-        Graphics2D g2d = (Graphics2D) g.create();
+    private void drawBoss(Graphics2D g2d) {
+        Graphics2D bossG = (Graphics2D) g2d.create();
 
-        g2d.setRenderingHint(
+        bossG.setRenderingHint(
             RenderingHints.KEY_INTERPOLATION,
             RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
         );
 
         if (bossImage != null) {
-            // 只畫出被切線以上的部分，讓老闆看起來在櫃檯裡面
-            Shape oldClip = g2d.getClip();
+            Shape oldClip = bossG.getClip();
 
-            g2d.setClip(
+            bossG.setClip(
                 bossX,
                 bossY,
                 BOSS_WIDTH,
                 getBossVisibleHeight()
             );
 
-            g2d.drawImage(
+            bossG.drawImage(
                 bossImage,
                 bossX,
                 bossY,
@@ -423,10 +459,10 @@ public class GearShopScreen extends JPanel {
                 this
             );
 
-            g2d.setClip(oldClip);
+            bossG.setClip(oldClip);
         } else {
-            g2d.setColor(new Color(80, 55, 35));
-            g2d.fillRoundRect(
+            bossG.setColor(new Color(80, 55, 35));
+            bossG.fillRoundRect(
                 bossX,
                 bossY,
                 BOSS_WIDTH,
@@ -435,17 +471,14 @@ public class GearShopScreen extends JPanel {
                 25
             );
 
-            g2d.setColor(new Color(230, 190, 120));
-            g2d.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
-            g2d.drawString("商店老闆", bossX + 25, bossY + 90);
+            bossG.setColor(new Color(230, 190, 120));
+            bossG.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
+            bossG.drawString("商店老闆", bossX + 25, bossY + 90);
         }
 
-        g2d.dispose();
+        bossG.dispose();
     }
 
-    // =========================
-    // 商店資訊更新
-    // =========================
     private void updateShopText() {
         moneyLabel.setText("目前金錢：$" + InventoryManager.getMoney());
 
@@ -459,6 +492,7 @@ public class GearShopScreen extends JPanel {
         );
 
         updateButtonTooltips();
+        layoutComponentsForFullscreen();
         repaint();
     }
 
@@ -602,21 +636,31 @@ public class GearShopScreen extends JPanel {
         super.addNotify();
         updateShopText();
         setBottomMessage("點選商店中的設備區域進行升級。");
+        SwingUtilities.invokeLater(() -> layoutComponentsForFullscreen());
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
+        Graphics2D g2d = (Graphics2D) g.create();
+
+        double scaleX = getScaleX();
+        double scaleY = getScaleY();
+
+        g2d.scale(scaleX, scaleY);
+
         if (shopBg != null) {
-            g.drawImage(shopBg, 0, 0, 1600, 900, this);
+            g2d.drawImage(shopBg, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, this);
         } else {
-            g.setColor(new Color(20, 25, 35));
-            g.fillRect(0, 0, getWidth(), getHeight());
+            g2d.setColor(new Color(20, 25, 35));
+            g2d.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         }
 
-        drawBoss(g);
-        drawBottomMessageBox(g);
+        drawBoss(g2d);
+        drawBottomMessageBox(g2d);
+
+        g2d.dispose();
     }
 
     private void drawBottomMessageBox(Graphics g) {

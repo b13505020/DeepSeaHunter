@@ -16,6 +16,8 @@ public class GameLauncher extends JFrame {
     private GearShopScreen gearShopPanel;
     private WeaponShopScreen weaponShopPanel;
     private BeachWorld beachPanel;
+    private AquariumView aquariumPanel;
+    private QuestHallView questHallPanel;
 
     private JPanel titlePanel;
     private boolean gameStarted = false;
@@ -28,33 +30,41 @@ public class GameLauncher extends JFrame {
     public GameLauncher() {
         setTitle("深海工域 - Deep Sea Industry");
 
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int frameWidth = Math.min(WIN_WIDTH, screenSize.width - 80);
-        int frameHeight = Math.min(WIN_HEIGHT, screenSize.height - 80);
-
-        setSize(frameWidth, frameHeight);
-        setLocationRelativeTo(null);
-        setResizable(true);
+        setUndecorated(true);
+        setResizable(false);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
         setupWindowCloseSave();
 
         titlePanel = createTitlePanel();
         mainPanel.add(titlePanel, "TitleScreen");
+
         mainPanel.setPreferredSize(new Dimension(WIN_WIDTH, WIN_HEIGHT));
-
-        JScrollPane scrollPane = new JScrollPane(mainPanel);
-        scrollPane.setBorder(null);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
-        scrollPane.getHorizontalScrollBar().setUnitIncrement(20);
-
-        add(scrollPane);
+        setContentPane(mainPanel);
 
         missionHud = new MissionHudOverlay();
         setGlassPane(missionHud);
         hideMissionHud();
 
         cardLayout.show(mainPanel, "TitleScreen");
+
+        mainPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+            KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+            "exitGame"
+        );
+
+        mainPanel.getActionMap().put("exitGame", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                exitGame();
+            }
+        });
+
+        GraphicsDevice gd = GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+
+        gd.setFullScreenWindow(this);
 
         setVisible(true);
     }
@@ -73,53 +83,28 @@ public class GameLauncher extends JFrame {
         }
     }
 
-    private void restoreHudAfterWindowClosed(Window window) {
-        if (window == null) {
-            return;
-        }
-
-        window.addWindowListener(new WindowAdapter() {
-            private boolean restored = false;
-
-            private void restore() {
-                if (restored) {
-                    return;
-                }
-
-                restored = true;
-                showMissionHud();
-
-                SwingUtilities.invokeLater(() -> {
-                    if (landPanel != null) {
-                        landPanel.requestFocusInWindow();
-                    }
-                });
-            }
-
-            @Override
-            public void windowClosed(WindowEvent e) {
-                restore();
-            }
-
-            @Override
-            public void windowClosing(WindowEvent e) {
-                restore();
-            }
-        });
-    }
-
     private void setupWindowCloseSave() {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                if (gameStarted) {
-                    InventoryManager.saveGame();
-                }
-
-                dispose();
-                System.exit(0);
+                exitGame();
             }
         });
+    }
+
+    private void exitGame() {
+        if (gameStarted) {
+            InventoryManager.saveGame();
+        }
+
+        GraphicsDevice gd = GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+
+        gd.setFullScreenWindow(null);
+
+        dispose();
+        System.exit(0);
     }
 
     private void createGamePanels() {
@@ -162,6 +147,24 @@ public class GameLauncher extends JFrame {
             });
         });
 
+        aquariumPanel = new AquariumView(e -> {
+            showMissionHud();
+            cardLayout.show(mainPanel, "LandScreen");
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.requestFocusInWindow();
+            });
+        });
+
+        questHallPanel = new QuestHallView(e -> {
+            showMissionHud();
+            cardLayout.show(mainPanel, "LandScreen");
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.requestFocusInWindow();
+            });
+        });
+
         landPanel = new LandWorld(
             e -> {
                 oceanPanel.resetPlayerPosition();
@@ -181,11 +184,11 @@ public class GameLauncher extends JFrame {
                 });
             },
             e -> {
-                showMissionHud();
-                new QuestHallView();
+                hideMissionHud();
+                cardLayout.show(mainPanel, "QuestHallScreen");
 
                 SwingUtilities.invokeLater(() -> {
-                    landPanel.requestFocusInWindow();
+                    questHallPanel.requestFocusInWindow();
                 });
             },
             e -> {
@@ -207,12 +210,20 @@ public class GameLauncher extends JFrame {
             },
             e -> {
                 hideMissionHud();
-
-                AquariumView aquariumView = new AquariumView();
-                restoreHudAfterWindowClosed(aquariumView);
+                cardLayout.show(mainPanel, "AquariumScreen");
 
                 SwingUtilities.invokeLater(() -> {
-                    landPanel.requestFocusInWindow();
+                    aquariumPanel.requestFocusInWindow();
+                });
+            },
+            e -> {
+                hideMissionHud();
+
+                SwingUtilities.invokeLater(() -> {
+                    cardLayout.show(mainPanel, "TitleScreen");
+                    mainPanel.revalidate();
+                    mainPanel.repaint();
+                    titlePanel.requestFocusInWindow();
                 });
             }
         );
@@ -223,6 +234,8 @@ public class GameLauncher extends JFrame {
         mainPanel.add(gearShopPanel, "GearShopScreen");
         mainPanel.add(weaponShopPanel, "WeaponShopScreen");
         mainPanel.add(beachPanel, "BeachScreen");
+        mainPanel.add(aquariumPanel, "AquariumScreen");
+        mainPanel.add(questHallPanel, "QuestHallScreen");
 
         mainPanel.revalidate();
         mainPanel.repaint();
@@ -289,6 +302,7 @@ public class GameLauncher extends JFrame {
 
             private JButton continueBtn;
             private JButton newGameBtn;
+            private JButton exitBtn;
 
             {
                 handCursor = loadCustomCursor();
@@ -299,20 +313,31 @@ public class GameLauncher extends JFrame {
                     System.out.println("Cannot load assets/cover.png");
                 }
 
-                continueBtn = createMenuButton("CONTINUE GAME", 600, 560, 400, 80);
+                continueBtn = createMenuButton("CONTINUE GAME");
                 continueBtn.setEnabled(InventoryManager.hasSaveFile());
                 continueBtn.addActionListener(e -> continueGame());
 
-                newGameBtn = createMenuButton("NEW GAME", 600, 660, 400, 80);
+                newGameBtn = createMenuButton("NEW GAME");
                 newGameBtn.addActionListener(e -> startNewGame());
+
+                exitBtn = createMenuButton("EXIT");
+                exitBtn.addActionListener(e -> exitGame());
 
                 add(continueBtn);
                 add(newGameBtn);
+                add(exitBtn);
+
+                addComponentListener(new ComponentAdapter() {
+                    @Override
+                    public void componentResized(ComponentEvent e) {
+                        layoutTitleButtons();
+                        repaint();
+                    }
+                });
             }
 
-            private JButton createMenuButton(String text, int x, int y, int w, int h) {
+            private JButton createMenuButton(String text) {
                 JButton btn = new JButton(text);
-                btn.setBounds(x, y, w, h);
                 btn.setFont(new Font("Monospaced", Font.BOLD, 30));
                 btn.setForeground(new Color(0, 255, 255));
                 btn.setContentAreaFilled(false);
@@ -321,6 +346,27 @@ public class GameLauncher extends JFrame {
                 btn.setBorder(BorderFactory.createLineBorder(new Color(0, 255, 255), 4));
                 btn.setCursor(handCursor);
                 return btn;
+            }
+
+            private void layoutTitleButtons() {
+                int panelW = getWidth();
+                int panelH = getHeight();
+
+                if (panelW <= 0 || panelH <= 0) {
+                    return;
+                }
+
+                int btnW = Math.max(360, panelW / 4);
+                int btnH = Math.max(65, panelH / 13);
+
+                int x = panelW / 2 - btnW / 2;
+
+                int continueY = (int) (panelH * 0.54);
+                int gap = 25;
+
+                continueBtn.setBounds(x, continueY, btnW, btnH);
+                newGameBtn.setBounds(x, continueY + btnH + gap, btnW, btnH);
+                exitBtn.setBounds(x, continueY + (btnH + gap) * 2, btnW, btnH);
             }
 
             private Cursor loadCustomCursor() {
@@ -365,6 +411,8 @@ public class GameLauncher extends JFrame {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
 
+                layoutTitleButtons();
+
                 if (coverImg != null) {
                     g.drawImage(coverImg, 0, 0, getWidth(), getHeight(), this);
                 } else {
@@ -374,6 +422,7 @@ public class GameLauncher extends JFrame {
 
                 drawButtonBackground(g, continueBtn);
                 drawButtonBackground(g, newGameBtn);
+                drawButtonBackground(g, exitBtn);
                 drawSaveStatus(g);
             }
 
@@ -411,19 +460,30 @@ public class GameLauncher extends JFrame {
             private void drawSaveStatus(Graphics g) {
                 g.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
 
+                String text;
+
                 if (InventoryManager.hasSaveFile()) {
                     g.setColor(new Color(180, 255, 220));
-                    g.drawString("已偵測到存檔，可選擇 Continue Game", 610, 765);
+                    text = "已偵測到存檔，可選擇 Continue Game";
                 } else {
                     g.setColor(new Color(255, 220, 180));
-                    g.drawString("尚未偵測到存檔，請選擇 New Game", 625, 765);
+                    text = "尚未偵測到存檔，請選擇 New Game";
                 }
+
+                FontMetrics fm = g.getFontMetrics();
+                int x = getWidth() / 2 - fm.stringWidth(text) / 2;
+                int y = Math.min(
+                    getHeight() - 35,
+                    exitBtn.getY() + exitBtn.getHeight() + 45
+                );
+
+                g.drawString(text, x, y);
             }
         };
     }
 
     public static void main(String[] args) {
-        System.setProperty("sun.java2d.uiScale", "0.8");
+        System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
 }
