@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class GameLauncher extends JFrame {
 
@@ -62,7 +63,11 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        GraphicsDevice gd = GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+
+        gd.setFullScreenWindow(this);
         setVisible(true);
         playAppleMusicPlaylist();
     }
@@ -106,11 +111,16 @@ public class GameLauncher extends JFrame {
         }
 
         try {
-            new ProcessBuilder(
+            Process pauseProcess = new ProcessBuilder(
                 "osascript",
                 "-e",
                 "tell application \"Music\" to pause"
             ).start();
+
+            if (!pauseProcess.waitFor(3, TimeUnit.SECONDS)) {
+                pauseProcess.destroy();
+                System.out.println("暫停 Apple Music 逾時。");
+            }
         } catch (Exception e) {
             System.out.println("無法暫停 Apple Music：" + e.getMessage());
         }
