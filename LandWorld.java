@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
 import java.io.File;
 import javax.imageio.ImageIO;
 
@@ -50,6 +51,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
     private Rectangle beachZone = new Rectangle(620, 680, 380, 210);
 
     private ActionListener onDive;
+    private ActionListener onEnterShallowOcean;
     private ActionListener onEnterShop;
     private ActionListener onEnterHeadquarters;
     private ActionListener onEnterBeach;
@@ -59,6 +61,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
 
     public LandWorld(
         ActionListener onDive,
+        ActionListener onEnterShallowOcean,
         ActionListener onEnterShop,
         ActionListener onEnterHeadquarters,
         ActionListener onEnterBeach,
@@ -67,6 +70,7 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         ActionListener onBackToTitle
     ) {
         this.onDive = onDive;
+        this.onEnterShallowOcean = onEnterShallowOcean;
         this.onEnterShop = onEnterShop;
         this.onEnterHeadquarters = onEnterHeadquarters;
         this.onEnterBeach = onEnterBeach;
@@ -367,10 +371,197 @@ public class LandWorld extends JPanel implements KeyListener, Runnable {
         } else if (isInShopZone(pRect)) {
             onEnterShop.actionPerformed(null);
         } else if (pRect.intersects(diveZone)) {
-            onDive.actionPerformed(null);
+            showDiveSelectDialog();
         } else if (isInBeachZone(pRect)) {
             onEnterBeach.actionPerformed(null);
         }
+    }
+
+    private void showDiveSelectDialog() {
+        left = false;
+        right = false;
+        up = false;
+        down = false;
+
+        JDialog dialog = new JDialog(
+            SwingUtilities.getWindowAncestor(this),
+            "選擇潛水地圖",
+            Dialog.ModalityType.APPLICATION_MODAL
+        );
+
+        dialog.setSize(760, 500);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+        dialog.setLayout(new BorderLayout());
+        dialog.getContentPane().setBackground(new Color(16, 28, 38));
+
+        JLabel titleLabel = new JLabel("請選擇要前往的海域", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 30));
+        titleLabel.setForeground(new Color(255, 225, 140));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(26, 0, 14, 0));
+
+        JPanel cardPanel = new JPanel(new GridLayout(1, 2, 28, 0));
+        cardPanel.setOpaque(false);
+        cardPanel.setBorder(BorderFactory.createEmptyBorder(20, 50, 25, 50));
+
+        JButton shallowButton = createDiveMapButton(
+            "淺水區",
+            "assets/shallow_ocean_map.jpeg",
+            new Color(70, 210, 230)
+        );
+
+        JButton deepButton = createDiveMapButton(
+            "深海區",
+            "assets/ocean_map.png",
+            new Color(80, 150, 255)
+        );
+
+        shallowButton.addActionListener(e -> {
+            dialog.dispose();
+
+            if (onEnterShallowOcean != null) {
+                onEnterShallowOcean.actionPerformed(null);
+            }
+        });
+
+        deepButton.addActionListener(e -> {
+            dialog.dispose();
+
+            if (onDive != null) {
+                onDive.actionPerformed(null);
+            }
+        });
+
+        cardPanel.add(shallowButton);
+        cardPanel.add(deepButton);
+
+        JButton cancelButton = new JButton("取消");
+        cancelButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+        cancelButton.setFocusable(false);
+        cancelButton.setForeground(Color.WHITE);
+        cancelButton.setBackground(new Color(70, 70, 80));
+        cancelButton.setBorder(BorderFactory.createEmptyBorder(10, 35, 10, 35));
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 25, 0));
+        bottomPanel.add(cancelButton);
+
+        dialog.add(titleLabel, BorderLayout.NORTH);
+        dialog.add(cardPanel, BorderLayout.CENTER);
+        dialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        dialog.setVisible(true);
+
+        requestFocusInWindow();
+    }
+
+    private JButton createDiveMapButton(String title, String imagePath, Color borderColor) {
+        JButton button = new JButton() {
+            private Image image;
+
+            {
+                try {
+                    image = ImageIO.read(new File(imagePath));
+                } catch (Exception e) {
+                    image = null;
+                    System.out.println("潛水地圖縮圖載入失敗：" + imagePath);
+                }
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+
+                g2.setRenderingHint(
+                    RenderingHints.KEY_ANTIALIASING,
+                    RenderingHints.VALUE_ANTIALIAS_ON
+                );
+
+                g2.setRenderingHint(
+                    RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                );
+
+                int w = getWidth();
+                int h = getHeight();
+
+                g2.setColor(new Color(8, 18, 28));
+                g2.fillRoundRect(0, 0, w, h, 24, 24);
+
+                if (image != null) {
+                    Shape oldClip = g2.getClip();
+
+                    g2.setClip(new RoundRectangle2D.Double(0, 0, w, h, 24, 24));
+
+                    int imgW = image.getWidth(this);
+                    int imgH = image.getHeight(this);
+
+                    double scale = Math.max(
+                        w / (double) imgW,
+                        h / (double) imgH
+                    );
+
+                    int drawW = (int) (imgW * scale);
+                    int drawH = (int) (imgH * scale);
+
+                    int drawX = (w - drawW) / 2;
+                    int drawY = (h - drawH) / 2;
+
+                    g2.drawImage(image, drawX, drawY, drawW, drawH, this);
+                    g2.setClip(oldClip);
+                } else {
+                    g2.setColor(new Color(25, 80, 100));
+                    g2.fillRoundRect(0, 0, w, h, 24, 24);
+                }
+
+                g2.setColor(new Color(0, 0, 0, 130));
+                g2.fillRoundRect(0, 0, w, h, 24, 24);
+
+                if (getModel().isRollover()) {
+                    g2.setColor(new Color(255, 255, 255, 45));
+                    g2.fillRoundRect(0, 0, w, h, 24, 24);
+                }
+
+                g2.setColor(borderColor);
+                g2.setStroke(new BasicStroke(5));
+                g2.drawRoundRect(3, 3, w - 7, h - 7, 24, 24);
+
+                g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 32));
+                FontMetrics fm = g2.getFontMetrics();
+
+                int textW = fm.stringWidth(title);
+                int textX = w / 2 - textW / 2;
+                int textY = h / 2 + fm.getAscent() / 2 - 6;
+
+                g2.setColor(new Color(0, 0, 0, 180));
+                g2.fillRoundRect(
+                    textX - 20,
+                    textY - fm.getAscent() - 10,
+                    textW + 40,
+                    56,
+                    16,
+                    16
+                );
+
+                g2.setColor(new Color(255, 235, 150));
+                g2.drawString(title, textX, textY);
+
+                g2.dispose();
+            }
+        };
+
+        button.setPreferredSize(new Dimension(280, 280));
+        button.setMinimumSize(new Dimension(280, 280));
+        button.setMaximumSize(new Dimension(280, 280));
+        button.setFocusable(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setOpaque(false);
+
+        return button;
     }
 
     @Override

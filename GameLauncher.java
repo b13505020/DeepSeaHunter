@@ -13,6 +13,7 @@ public class GameLauncher extends JFrame {
 
     private LandWorld landPanel;
     private OceanWorld oceanPanel;
+    private ShallowOceanWorld shallowOceanPanel;
     private GearShopScreen gearShopPanel;
     private WeaponShopScreen weaponShopPanel;
     private BeachWorld beachPanel;
@@ -61,12 +62,7 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        GraphicsDevice gd = GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .getDefaultScreenDevice();
-
-        gd.setFullScreenWindow(this);
-
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         setVisible(true);
         playAppleMusicPlaylist();
     }
@@ -162,9 +158,7 @@ public class GameLauncher extends JFrame {
         showMissionHud();
         showScreen("LandScreen");
 
-        SwingUtilities.invokeLater(() -> {
-            landPanel.requestFocusInWindow();
-        });
+        SwingUtilities.invokeLater(() -> landPanel.requestFocusInWindow());
     }
 
     private void setupWindowCloseSave() {
@@ -192,6 +186,7 @@ public class GameLauncher extends JFrame {
         dispose();
         System.exit(0);
     }
+    
 
     private void createGamePanels() {
         mainPanel.removeAll();
@@ -204,25 +199,23 @@ public class GameLauncher extends JFrame {
             });
         });
 
-        gearShopPanel = new GearShopScreen(e -> {
+        shallowOceanPanel = new ShallowOceanWorld(e -> {
             returnToLand();
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.resetPlayerPosition();
+            });
         });
 
-        weaponShopPanel = new WeaponShopScreen(e -> {
-            returnToLand();
-        });
+        gearShopPanel = new GearShopScreen(e -> returnToLand());
 
-        beachPanel = new BeachWorld(e -> {
-            returnToLand();
-        });
+        weaponShopPanel = new WeaponShopScreen(e -> returnToLand());
 
-        aquariumPanel = new AquariumView(e -> {
-            returnToLand();
-        });
+        beachPanel = new BeachWorld(e -> returnToLand());
 
-        questHallPanel = new QuestHallView(e -> {
-            returnToLand();
-        });
+        aquariumPanel = new AquariumView(e -> returnToLand());
+
+        questHallPanel = new QuestHallView(e -> returnToLand());
 
         landPanel = new LandWorld(
             e -> {
@@ -232,6 +225,15 @@ public class GameLauncher extends JFrame {
 
                 SwingUtilities.invokeLater(() -> {
                     oceanPanel.requestFocusInWindow();
+                });
+            },
+            e -> {
+                shallowOceanPanel.resetPlayerPosition();
+                showMissionHud();
+                showScreen("ShallowOceanScreen");
+
+                SwingUtilities.invokeLater(() -> {
+                    shallowOceanPanel.requestFocusInWindow();
                 });
             },
             e -> {
@@ -288,6 +290,7 @@ public class GameLauncher extends JFrame {
         mainPanel.add(titlePanel, "TitleScreen");
         mainPanel.add(landPanel, "LandScreen");
         mainPanel.add(oceanPanel, "OceanScreen");
+        mainPanel.add(shallowOceanPanel, "ShallowOceanScreen");
         mainPanel.add(gearShopPanel, "GearShopScreen");
         mainPanel.add(weaponShopPanel, "WeaponShopScreen");
         mainPanel.add(beachPanel, "BeachScreen");
@@ -318,7 +321,6 @@ public class GameLauncher extends JFrame {
         createGamePanels();
 
         showMissionHud();
-
         showScreen("LandScreen");
 
         SwingUtilities.invokeLater(() -> {
@@ -344,7 +346,6 @@ public class GameLauncher extends JFrame {
         createGamePanels();
 
         showMissionHud();
-
         showScreen("LandScreen");
 
         SwingUtilities.invokeLater(() -> {
@@ -543,4 +544,4 @@ public class GameLauncher extends JFrame {
         System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
-}
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

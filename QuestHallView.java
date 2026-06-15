@@ -480,21 +480,46 @@ public class QuestHallView extends JPanel {
         private void openOrFocusWindow(Class<?> windowClass) {
             for (Window window : Window.getWindows()) {
                 if (windowClass.isInstance(window) && window.isDisplayable()) {
-                    window.toFront();
-                    window.requestFocus();
+                    forceWindowToFront(window);
                     return;
                 }
             }
 
+            Window newWindow = null;
+
             if (windowClass == TavernView.class) {
-                TavernView tavern = new TavernView();
-                tavern.toFront();
-                tavern.requestFocus();
+                newWindow = new TavernView();
             } else if (windowClass == MissionBoardView.class) {
-                MissionBoardView board = new MissionBoardView();
-                board.toFront();
-                board.requestFocus();
+                newWindow = new MissionBoardView();
             }
+
+            if (newWindow != null) {
+                forceWindowToFront(newWindow);
+            }
+        }
+
+        private void forceWindowToFront(Window window) {
+            if (window == null) {
+                return;
+            }
+
+            window.setVisible(true);
+            window.setAlwaysOnTop(true);
+            window.toFront();
+            window.requestFocus();
+
+            SwingUtilities.invokeLater(() -> {
+                window.toFront();
+                window.requestFocus();
+            });
+
+            Timer bringFrontTimer = new Timer(250, e -> {
+                window.toFront();
+                window.requestFocus();
+            });
+
+            bringFrontTimer.setRepeats(false);
+            bringFrontTimer.start();
         }
 
         @Override
@@ -530,13 +555,19 @@ public class QuestHallView extends JPanel {
         }
 
         @Override public void mouseDragged(MouseEvent e) {}
-        @Override public void mousePressed(MouseEvent e) {
+
+        @Override
+        public void mousePressed(MouseEvent e) {
             requestFocusInWindow();
         }
+
         @Override public void mouseReleased(MouseEvent e) {}
-        @Override public void mouseEntered(MouseEvent e) {
+
+        @Override
+        public void mouseEntered(MouseEvent e) {
             requestFocusInWindow();
         }
+
         @Override public void mouseExited(MouseEvent e) {}
         @Override public void keyReleased(KeyEvent e) {}
         @Override public void keyTyped(KeyEvent e) {}

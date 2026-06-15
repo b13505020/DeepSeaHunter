@@ -59,7 +59,9 @@ public class AquariumView extends JPanel {
         private Rectangle buyButtonRect = new Rectangle(1210, 555, 145, 50);
         private Rectangle feedButtonRect = new Rectangle(1370, 555, 145, 50);
         private Rectangle feedShopCloseRect = new Rectangle(1500, 172, 28, 28);
-        private Rectangle exitButtonRect = new Rectangle(55, 790, 160, 52);
+
+        // 已調整：往上移，避免跟底部訊息重疊
+        private Rectangle exitButtonRect = new Rectangle(55, 730, 170, 52);
 
         private Rectangle tankRect = new Rectangle(75, 90, 1060, 545);
 
@@ -452,31 +454,9 @@ public class AquariumView extends JPanel {
                 Image img = icon.getImage();
 
                 if (dir > 0) {
-                    g2.drawImage(
-                        img,
-                        x,
-                        y,
-                        x + w,
-                        y + h,
-                        0,
-                        0,
-                        icon.getIconWidth(),
-                        icon.getIconHeight(),
-                        this
-                    );
+                    g2.drawImage(img, x, y, x + w, y + h, 0, 0, icon.getIconWidth(), icon.getIconHeight(), this);
                 } else {
-                    g2.drawImage(
-                        img,
-                        x + w,
-                        y,
-                        x,
-                        y + h,
-                        0,
-                        0,
-                        icon.getIconWidth(),
-                        icon.getIconHeight(),
-                        this
-                    );
+                    g2.drawImage(img, x + w, y, x, y + h, 0, 0, icon.getIconWidth(), icon.getIconHeight(), this);
                 }
             } else {
                 drawFallbackFish(g2, x, y, w, h, dir, fish.getName());
@@ -538,23 +518,9 @@ public class AquariumView extends JPanel {
                 );
 
                 if (visitor.image != null) {
-                    g2.drawImage(
-                        visitor.image,
-                        visitor.x + xOffset,
-                        visitor.y + yOffset,
-                        visitor.w,
-                        visitor.h,
-                        this
-                    );
+                    g2.drawImage(visitor.image, visitor.x + xOffset, visitor.y + yOffset, visitor.w, visitor.h, this);
                 } else {
-                    drawPixelVisitor(
-                        g2,
-                        visitor.x + xOffset,
-                        visitor.y + yOffset,
-                        visitor.w,
-                        visitor.h,
-                        visitor.phase
-                    );
+                    drawPixelVisitor(g2, visitor.x + xOffset, visitor.y + yOffset, visitor.w, visitor.h, visitor.phase);
                 }
             }
         }
@@ -580,14 +546,7 @@ public class AquariumView extends JPanel {
             int yOffset = (int) (Math.sin(tick * 0.05) * 2);
 
             if (guideImg != null) {
-                g2.drawImage(
-                    guideImg,
-                    guideRect.x,
-                    guideRect.y + yOffset,
-                    guideRect.width,
-                    guideRect.height,
-                    this
-                );
+                g2.drawImage(guideImg, guideRect.x, guideRect.y + yOffset, guideRect.width, guideRect.height, this);
             } else {
                 drawPixelGuide(g2, guideRect.x, guideRect.y + yOffset, guideRect.width, guideRect.height);
             }
@@ -595,14 +554,7 @@ public class AquariumView extends JPanel {
             if (guideHovered) {
                 g2.setColor(new Color(255, 230, 120, 95));
                 g2.setStroke(new BasicStroke(3));
-                g2.drawRoundRect(
-                    guideRect.x - 6,
-                    guideRect.y - 6,
-                    guideRect.width + 12,
-                    guideRect.height + 12,
-                    18,
-                    18
-                );
+                g2.drawRoundRect(guideRect.x - 6, guideRect.y - 6, guideRect.width + 12, guideRect.height + 12, 18, 18);
             }
         }
 
@@ -669,27 +621,12 @@ public class AquariumView extends JPanel {
             boolean hover = feedShopCloseRect.contains(mouse);
 
             g2.setColor(hover ? new Color(185, 70, 58) : new Color(115, 48, 40));
-            g2.fillOval(
-                feedShopCloseRect.x,
-                feedShopCloseRect.y,
-                feedShopCloseRect.width,
-                feedShopCloseRect.height
-            );
+            g2.fillOval(feedShopCloseRect.x, feedShopCloseRect.y, feedShopCloseRect.width, feedShopCloseRect.height);
 
             g2.setColor(new Color(255, 230, 170));
             g2.setStroke(new BasicStroke(3));
-            g2.drawLine(
-                feedShopCloseRect.x + 8,
-                feedShopCloseRect.y + 8,
-                feedShopCloseRect.x + 20,
-                feedShopCloseRect.y + 20
-            );
-            g2.drawLine(
-                feedShopCloseRect.x + 20,
-                feedShopCloseRect.y + 8,
-                feedShopCloseRect.x + 8,
-                feedShopCloseRect.y + 20
-            );
+            g2.drawLine(feedShopCloseRect.x + 8, feedShopCloseRect.y + 8, feedShopCloseRect.x + 20, feedShopCloseRect.y + 20);
+            g2.drawLine(feedShopCloseRect.x + 20, feedShopCloseRect.y + 8, feedShopCloseRect.x + 8, feedShopCloseRect.y + 20);
         }
 
         private void drawActionButton(Graphics2D g2, Rectangle rect, String text, Color top, Color bottom) {
@@ -764,15 +701,7 @@ public class AquariumView extends JPanel {
             g2.setColor(new Color(0, 0, 0, 90));
             g2.fillOval(x - 2, y + 36, 34, 8);
 
-            g2.setPaint(new GradientPaint(
-                x,
-                y,
-                new Color(110, 160, 170),
-                x,
-                y + 40,
-                new Color(36, 62, 70)
-            ));
-
+            g2.setPaint(new GradientPaint(x, y, new Color(110, 160, 170), x, y + 40, new Color(36, 62, 70)));
             g2.fillRoundRect(x, y, 30, 42, 9, 9);
 
             g2.setColor(new Color(225, 185, 95));
@@ -900,14 +829,16 @@ public class AquariumView extends JPanel {
         }
 
         private void drawMessage(Graphics2D g2) {
-            if (message == null || message.isEmpty()) {
-                return;
-            }
+    if (message == null || message.isEmpty()) {
+        return;
+    }
 
-            g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
-            g2.setColor(new Color(255, 235, 170));
-            g2.drawString(message, 60, 845);
-        }
+    g2.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
+    g2.setColor(new Color(255, 235, 170));
+
+    // 歡迎訊息靠左顯示，放在離開按鈕上方，避免重疊
+    g2.drawString(message, 30, 835);
+}
 
         private void drawPanel(Graphics2D g2, int x, int y, int w, int h) {
             g2.setColor(new Color(0, 0, 0, 145));
@@ -1087,10 +1018,13 @@ public class AquariumView extends JPanel {
         }
 
         @Override public void mousePressed(MouseEvent e) {}
+
         @Override public void mouseReleased(MouseEvent e) {}
+
         @Override public void mouseEntered(MouseEvent e) {
             requestFocusInWindow();
         }
+
         @Override public void mouseExited(MouseEvent e) {}
 
         @Override
@@ -1105,6 +1039,7 @@ public class AquariumView extends JPanel {
         }
 
         @Override public void keyReleased(KeyEvent e) {}
+
         @Override public void keyTyped(KeyEvent e) {}
     }
 
