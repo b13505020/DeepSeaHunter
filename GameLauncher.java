@@ -13,6 +13,7 @@ public class GameLauncher extends JFrame {
 
     private LandWorld landPanel;
     private OceanWorld oceanPanel;
+    private ShallowOceanWorld shallowOceanPanel;
     private GearShopScreen gearShopPanel;
     private WeaponShopScreen weaponShopPanel;
     private BeachWorld beachPanel;
@@ -30,7 +31,6 @@ public class GameLauncher extends JFrame {
     public GameLauncher() {
         setTitle("深海工域 - Deep Sea Industry");
 
-        // 保留無邊框，畫面仍然像全螢幕
         setUndecorated(true);
         setResizable(false);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -61,9 +61,6 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        // 重點：
-        // 不再使用 gd.setFullScreenWindow(this)
-        // 改成最大化無邊框，這樣 TavernView / MissionBoardView 才能跳出來
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setVisible(true);
     }
@@ -96,15 +93,25 @@ public class GameLauncher extends JFrame {
             InventoryManager.saveGame();
         }
 
-        // 因為不再使用 gd.setFullScreenWindow(this)，所以這裡也不用 gd.setFullScreenWindow(null)
         dispose();
         System.exit(0);
     }
+    
 
     private void createGamePanels() {
         mainPanel.removeAll();
 
         oceanPanel = new OceanWorld(e -> {
+            showMissionHud();
+            cardLayout.show(mainPanel, "LandScreen");
+
+            SwingUtilities.invokeLater(() -> {
+                landPanel.resetPlayerPosition();
+                landPanel.requestFocusInWindow();
+            });
+        });
+
+        shallowOceanPanel = new ShallowOceanWorld(e -> {
             showMissionHud();
             cardLayout.show(mainPanel, "LandScreen");
 
@@ -170,6 +177,15 @@ public class GameLauncher extends JFrame {
                 });
             },
             e -> {
+                shallowOceanPanel.resetPlayerPosition();
+                showMissionHud();
+                cardLayout.show(mainPanel, "ShallowOceanScreen");
+
+                SwingUtilities.invokeLater(() -> {
+                    shallowOceanPanel.requestFocusInWindow();
+                });
+            },
+            e -> {
                 hideMissionHud();
                 cardLayout.show(mainPanel, "GearShopScreen");
 
@@ -225,6 +241,7 @@ public class GameLauncher extends JFrame {
         mainPanel.add(titlePanel, "TitleScreen");
         mainPanel.add(landPanel, "LandScreen");
         mainPanel.add(oceanPanel, "OceanScreen");
+        mainPanel.add(shallowOceanPanel, "ShallowOceanScreen");
         mainPanel.add(gearShopPanel, "GearShopScreen");
         mainPanel.add(weaponShopPanel, "WeaponShopScreen");
         mainPanel.add(beachPanel, "BeachScreen");
@@ -255,7 +272,6 @@ public class GameLauncher extends JFrame {
         createGamePanels();
 
         showMissionHud();
-
         cardLayout.show(mainPanel, "LandScreen");
 
         SwingUtilities.invokeLater(() -> {
@@ -281,7 +297,6 @@ public class GameLauncher extends JFrame {
         createGamePanels();
 
         showMissionHud();
-
         cardLayout.show(mainPanel, "LandScreen");
 
         SwingUtilities.invokeLater(() -> {
@@ -480,4 +495,4 @@ public class GameLauncher extends JFrame {
         System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
-}
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
