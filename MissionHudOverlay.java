@@ -40,10 +40,10 @@ public class MissionHudOverlay extends JComponent {
     private void drawMissionHud(Graphics2D g2) {
         List<MissionBoardView.Mission> missions = MissionBoardView.getAcceptedMissions();
 
-        int panelX = 1125;
-        int panelY = 25;
         int panelW = 430;
         int panelH = 165;
+        int panelX = getRightAlignedPanelX(panelW);
+        int panelY = 25;
 
         drawPanel(g2, panelX, panelY, panelW, panelH);
 
@@ -95,10 +95,10 @@ public class MissionHudOverlay extends JComponent {
     }
 
     private void drawAquariumIncomeHud(Graphics2D g2) {
-        int panelX = 1125;
-        int panelY = 205;
         int panelW = 430;
         int panelH = 92;
+        int panelX = getRightAlignedPanelX(panelW);
+        int panelY = 205;
 
         drawPanel(g2, panelX, panelY, panelW, panelH);
 
@@ -117,6 +117,11 @@ public class MissionHudOverlay extends JComponent {
         g2.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
         g2.setColor(new Color(220, 235, 235));
         g2.drawString("上次 +$" + lastIncome + "｜下次 " + nextSeconds + " 秒", panelX + 210, panelY + 60);
+    }
+
+    private int getRightAlignedPanelX(int panelWidth) {
+        int rightMargin = 25;
+        return Math.max(rightMargin, getWidth() - panelWidth - rightMargin);
     }
 
     private void drawPanel(Graphics2D g2, int x, int y, int w, int h) {
