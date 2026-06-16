@@ -63,13 +63,18 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        GraphicsDevice gd = GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .getDefaultScreenDevice();
+        setupSafeFullScreen();
 
-        gd.setFullScreenWindow(this);
         setVisible(true);
         playAppleMusicPlaylist();
+    }
+
+    private void setupSafeFullScreen() {
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+        setSize(screenSize.width, screenSize.height);
+        setLocation(0, 0);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
 
     private void playAppleMusicPlaylist() {
@@ -187,16 +192,9 @@ public class GameLauncher extends JFrame {
 
         stopAppleMusic();
 
-        GraphicsDevice gd = GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .getDefaultScreenDevice();
-
-        gd.setFullScreenWindow(null);
-
         dispose();
         System.exit(0);
     }
-    
 
     private void createGamePanels() {
         mainPanel.removeAll();
@@ -280,14 +278,14 @@ public class GameLauncher extends JFrame {
                 });
             },
             e -> {
-hideMissionHud();
-showScreen("AquariumScreen");
+                hideMissionHud();
+                showScreen("AquariumScreen");
 
-    SwingUtilities.invokeLater(() -> {
-        aquariumPanel.startAquarium();
-        aquariumPanel.requestFocusInWindow();
-    });
-},
+                SwingUtilities.invokeLater(() -> {
+                    aquariumPanel.startAquarium();
+                    aquariumPanel.requestFocusInWindow();
+                });
+            },
             e -> {
                 hideMissionHud();
 
@@ -555,4 +553,4 @@ showScreen("AquariumScreen");
         System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
-}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+}
