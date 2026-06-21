@@ -63,18 +63,13 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        setupSafeFullScreen();
+        GraphicsDevice gd = GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
 
+        gd.setFullScreenWindow(this);
         setVisible(true);
         playAppleMusicPlaylist();
-    }
-
-    private void setupSafeFullScreen() {
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-        setSize(screenSize.width, screenSize.height);
-        setLocation(0, 0);
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
 
     private void playAppleMusicPlaylist() {
@@ -95,13 +90,21 @@ public class GameLauncher extends JFrame {
                 "-e",
                 "if trackCount is 0 then return",
                 "-e",
-                "set randomIndex to random number from 1 to trackCount",
-                "-e",
                 "set shuffle enabled to true",
                 "-e",
                 "set song repeat to all",
                 "-e",
-                "play track randomIndex of targetPlaylist",
+                "play targetPlaylist",
+                "-e",
+                "delay 0.2",
+                "-e",
+                "set skipCount to random number from 0 to trackCount - 1",
+                "-e",
+                "repeat skipCount times",
+                "-e",
+                "next track",
+                "-e",
+                "end repeat",
                 "-e",
                 "end tell"
             ).start();
@@ -192,9 +195,16 @@ public class GameLauncher extends JFrame {
 
         stopAppleMusic();
 
+        GraphicsDevice gd = GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+
+        gd.setFullScreenWindow(null);
+
         dispose();
         System.exit(0);
     }
+    
 
     private void createGamePanels() {
         mainPanel.removeAll();
@@ -282,7 +292,6 @@ public class GameLauncher extends JFrame {
                 showScreen("AquariumScreen");
 
                 SwingUtilities.invokeLater(() -> {
-                    aquariumPanel.startAquarium();
                     aquariumPanel.requestFocusInWindow();
                 });
             },
@@ -553,4 +562,4 @@ public class GameLauncher extends JFrame {
         System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
-}
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

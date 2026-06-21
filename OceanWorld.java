@@ -51,6 +51,7 @@ public class OceanWorld extends JPanel {
     private Map<String, BufferedImage> weaponImageCache = new HashMap<>();
 
     private ArrayList<Bullet> bullets = new ArrayList<>();
+    private ArrayList<ExplosionEffect> explosionEffects = new ArrayList<>();
     private ArrayList<OceanFish> fishList = new ArrayList<>();
 
     private Timer gameTimer;
@@ -412,10 +413,101 @@ public class OceanWorld extends JPanel {
 
             for (OceanFish f : fishList) {
                 if (!f.dead && b.getBounds().intersects(f.getBounds())) {
-                    f.takeDamage(b.getDamage());
-                    bullets.remove(i);
+                    applyBulletEffect(b, f);
+
+                    if (b.isPiercingBullet()) {
+                        b.registerPierceHit();
+
+                        if (!b.canPierceAfterHit()) {
+                            bullets.remove(i);
+                        }
+                    } else {
+                        bullets.remove(i);
+                    }
+
                     break;
                 }
+            }
+        }
+    }
+
+    private void applyBulletEffect(Bullet bullet, OceanFish target) {
+        if (bullet.isExplosionBullet()) {
+            applyExplosionBullet(bullet);
+            return;
+        }
+
+        if (bullet.isNetBullet()) {
+            applyNetBullet(bullet);
+            return;
+        }
+
+        target.takeDamage(bullet.getDamage());
+
+        if (bullet.getSleepDurationMs() > 0) {
+            if (bullet.getWeaponName().equals("麻醉槍")) {
+                target.tranquilizedUntil = Math.max(
+                    target.tranquilizedUntil,
+                    System.currentTimeMillis() + bullet.getSleepDurationMs()
+                );
+            } else {
+                target.sleepUntil = Math.max(
+                    target.sleepUntil,
+                    System.currentTimeMillis() + bullet.getSleepDurationMs()
+                );
+            }
+        }
+
+        if (bullet.getSlowDurationMs() > 0) {
+            target.slowUntil = Math.max(
+                target.slowUntil,
+                System.currentTimeMillis() + bullet.getSlowDurationMs()
+            );
+        }
+    }
+
+    private void applyExplosionBullet(Bullet bullet) {
+        int radius = bullet.getExplosionRadius();
+        int bx = bullet.getX();
+        int by = bullet.getY();
+
+        explosionEffects.add(new ExplosionEffect(bx, by, radius));
+
+        for (OceanFish f : fishList) {
+            if (f.dead) {
+                continue;
+            }
+
+            Rectangle bounds = f.getBounds();
+            double dx = bounds.getCenterX() - bx;
+            double dy = bounds.getCenterY() - by;
+
+            if (Math.sqrt(dx * dx + dy * dy) <= radius) {
+                f.takeDamage(bullet.getDamage());
+            }
+        }
+    }
+
+    private void applyNetBullet(Bullet bullet) {
+        int radius = bullet.getNetRadius();
+        int bx = bullet.getX();
+        int by = bullet.getY();
+
+        for (OceanFish f : fishList) {
+            if (f.dead) {
+                continue;
+            }
+
+            Rectangle bounds = f.getBounds();
+            double dx = bounds.getCenterX() - bx;
+            double dy = bounds.getCenterY() - by;
+
+            if (Math.sqrt(dx * dx + dy * dy) <= radius) {
+                f.netted = true;
+                f.nettedAt = System.currentTimeMillis();
+                f.dead = true;
+                f.vx = 0;
+                f.vy = 0;
             }
         }
     }
@@ -665,6 +757,17 @@ public class OceanWorld extends JPanel {
         for (OceanFish f : fishList) {
             int sx = (int) f.x - cameraX;
             int sy = (int) f.y - cameraY;
+            long now = System.currentTimeMillis();
+            int struggleX = 0;
+            int struggleY = 0;
+
+            if (f.netted && now - f.nettedAt < 2500) {
+                struggleX = (int) Math.round(Math.sin(now * 0.04) * 5);
+                struggleY = (int) Math.round(Math.cos(now * 0.05) * 3);
+            }
+
+            sx += struggleX;
+            sy += struggleY;
 
             ImageIcon icon = new ImageIcon(f.imagePath);
 
@@ -703,17 +806,14 @@ public class OceanWorld extends JPanel {
                     1.0f
                 )
             );
+
+            drawFishWeaponEffects(g2d, sx, sy, f);
         }
 
-        g2d.setColor(Color.YELLOW);
+        drawExplosionEffects(g2d);
 
         for (Bullet b : bullets) {
-            g2d.fillOval(
-                b.getX() - cameraX,
-                b.getY() - cameraY,
-                10,
-                10
-            );
+            b.draw(g2d, cameraX, cameraY);
         }
 
         int sx = (int) playerX - cameraX;
@@ -945,6 +1045,11 @@ public class OceanWorld extends JPanel {
         boolean isScared;
 
         long scaredStartTime;
+        long sleepUntil;
+        long tranquilizedUntil;
+        long slowUntil;
+        long nettedAt;
+        boolean netted;
 
         private final double MAX_SCARE_BOOST = 3.5;
 
@@ -978,11 +1083,18 @@ public class OceanWorld extends JPanel {
                 return;
             }
 
-            double mult = isScared ? MAX_SCARE_BOOST : 1.0;
+            long now = System.currentTimeMillis();
+
+            if (now < sleepUntil || now < tranquilizedUntil) {
+                return;
+            }
+
+            double slowMult = now < slowUntil ? 0.35 : 1.0;
+            double mult = (isScared ? MAX_SCARE_BOOST : 1.0) * slowMult;
 
             if (
                 isScared
-                && System.currentTimeMillis() - scaredStartTime > 1000
+                && now - scaredStartTime > 1000
             ) {
                 isScared = false;
             }
@@ -1025,6 +1137,164 @@ public class OceanWorld extends JPanel {
 
         Rectangle getBounds() {
             return new Rectangle((int) x, (int) y, size, size);
+        }
+    }
+
+    private void drawFishWeaponEffects(Graphics2D g2d, int sx, int sy, OceanFish fish) {
+        int fishW = fish.size;
+        int fishH = (int) (fish.size * 0.75);
+        long now = System.currentTimeMillis();
+
+        if (now < fish.sleepUntil) {
+            Graphics2D sleepG = (Graphics2D) g2d.create();
+            sleepG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            sleepG.setFont(new Font("Monospaced", Font.BOLD, 22));
+            sleepG.setColor(new Color(225, 225, 255, 225));
+
+            int bob = (int) Math.round(Math.sin(now * 0.006) * 5);
+            sleepG.drawString("Zzz", sx + fishW / 2 - 18, sy - 12 + bob);
+            sleepG.dispose();
+        }
+
+        if (now < fish.tranquilizedUntil) {
+            Graphics2D tranqG = (Graphics2D) g2d.create();
+            tranqG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int pulse = (int) Math.round(Math.sin(now * 0.008) * 6);
+            tranqG.setColor(new Color(255, 120, 210, 90));
+            tranqG.fillOval(sx - 8 - pulse, sy - 8 - pulse, fishW + 16 + pulse * 2, fishH + 16 + pulse * 2);
+
+            tranqG.setStroke(new BasicStroke(3));
+            tranqG.setColor(new Color(255, 170, 235, 210));
+            tranqG.drawOval(sx - 6 - pulse, sy - 6 - pulse, fishW + 12 + pulse * 2, fishH + 12 + pulse * 2);
+
+            tranqG.setFont(new Font("Monospaced", Font.BOLD, 22));
+            tranqG.setColor(new Color(255, 215, 245, 230));
+            int markX = sx + fishW / 2 - 18;
+            int markY = sy - 12;
+            tranqG.drawString("+ +", markX, markY);
+
+            int cx = sx + fishW / 2;
+            int cy = sy + fishH / 2;
+            for (int i = 0; i < 5; i++) {
+                double angle = now * 0.006 + i * Math.PI * 2 / 5.0;
+                int dotX = cx + (int) (Math.cos(angle) * (fishW * 0.48));
+                int dotY = cy + (int) (Math.sin(angle) * (fishH * 0.48));
+                tranqG.fillOval(dotX - 4, dotY - 4, 8, 8);
+            }
+
+            tranqG.dispose();
+        }
+
+        if (now < fish.slowUntil) {
+            Graphics2D iceG = (Graphics2D) g2d.create();
+            iceG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            iceG.setColor(new Color(120, 225, 255, 95));
+            iceG.fillOval(sx - 8, sy - 8, fishW + 16, fishH + 16);
+
+            iceG.setColor(new Color(210, 250, 255, 190));
+            iceG.setStroke(new BasicStroke(3));
+            iceG.drawOval(sx - 6, sy - 6, fishW + 12, fishH + 12);
+
+            int cx = sx + fishW / 2;
+            int cy = sy + fishH / 2;
+            for (int i = 0; i < 6; i++) {
+                double angle = Math.PI * 2 * i / 6.0 + now * 0.004;
+                int x1 = cx + (int) (Math.cos(angle) * fishW * 0.18);
+                int y1 = cy + (int) (Math.sin(angle) * fishH * 0.18);
+                int x2 = cx + (int) (Math.cos(angle) * fishW * 0.55);
+                int y2 = cy + (int) (Math.sin(angle) * fishH * 0.55);
+                iceG.drawLine(x1, y1, x2, y2);
+            }
+
+            iceG.dispose();
+        }
+
+        if (fish.netted) {
+            Graphics2D netG = (Graphics2D) g2d.create();
+            netG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            netG.setColor(new Color(235, 245, 225, 185));
+            netG.setStroke(new BasicStroke(2));
+            int netSize = Math.max(fishW, fishH) + 34;
+            int netX = sx + fishW / 2 - netSize / 2;
+            int netY = sy + fishH / 2 - netSize / 2;
+            netG.drawOval(netX, netY, netSize, netSize);
+            netG.drawOval(netX + netSize / 4, netY + netSize / 4, netSize / 2, netSize / 2);
+
+            int cx = netX + netSize / 2;
+            int cy = netY + netSize / 2;
+            for (int i = 0; i < 8; i++) {
+                double angle = Math.PI * 2 * i / 8.0;
+                int ex = cx + (int) (Math.cos(angle) * netSize / 2);
+                int ey = cy + (int) (Math.sin(angle) * netSize / 2);
+                netG.drawLine(cx, cy, ex, ey);
+            }
+
+            for (int offset = -netSize / 3; offset <= netSize / 3; offset += 18) {
+                netG.drawArc(netX + offset, netY, netSize, netSize, 70, 40);
+                netG.drawArc(netX + offset, netY, netSize, netSize, 250, 40);
+                netG.drawArc(netX, netY + offset, netSize, netSize, -20, 40);
+                netG.drawArc(netX, netY + offset, netSize, netSize, 160, 40);
+            }
+
+            netG.dispose();
+        }
+    }
+
+    private void drawExplosionEffects(Graphics2D g2d) {
+        long now = System.currentTimeMillis();
+
+        for (int i = explosionEffects.size() - 1; i >= 0; i--) {
+            ExplosionEffect effect = explosionEffects.get(i);
+            double progress = (now - effect.startTime) / 520.0;
+
+            if (progress >= 1.0) {
+                explosionEffects.remove(i);
+                continue;
+            }
+
+            int x = effect.x - cameraX;
+            int y = effect.y - cameraY;
+            int radius = (int) (effect.radius * (0.35 + progress * 0.85));
+            int alpha = (int) (220 * (1.0 - progress));
+
+            Graphics2D fireG = (Graphics2D) g2d.create();
+            fireG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            fireG.setColor(new Color(255, 80, 20, Math.max(0, alpha)));
+            fireG.fillOval(x - radius, y - radius, radius * 2, radius * 2);
+
+            fireG.setColor(new Color(255, 190, 40, Math.max(0, alpha)));
+            fireG.fillOval(x - radius / 2, y - radius / 2, radius, radius);
+
+            fireG.setStroke(new BasicStroke(4));
+            fireG.setColor(new Color(255, 230, 120, Math.max(0, alpha)));
+            for (int spark = 0; spark < 10; spark++) {
+                double angle = Math.PI * 2 * spark / 10.0 + progress * 2.0;
+                int x1 = x + (int) (Math.cos(angle) * radius * 0.35);
+                int y1 = y + (int) (Math.sin(angle) * radius * 0.35);
+                int x2 = x + (int) (Math.cos(angle) * radius * 1.15);
+                int y2 = y + (int) (Math.sin(angle) * radius * 1.15);
+                fireG.drawLine(x1, y1, x2, y2);
+            }
+
+            fireG.dispose();
+        }
+    }
+
+    private class ExplosionEffect {
+        int x;
+        int y;
+        int radius;
+        long startTime;
+
+        ExplosionEffect(int x, int y, int radius) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.startTime = System.currentTimeMillis();
         }
     }
 }
