@@ -23,6 +23,7 @@ public class GameLauncher extends JFrame {
 
     private JPanel titlePanel;
     private boolean gameStarted = false;
+    private boolean tutorialShown = false;
     private String currentScreen = "TitleScreen";
 
     private MissionHudOverlay missionHud;
@@ -63,13 +64,18 @@ public class GameLauncher extends JFrame {
             }
         });
 
-        GraphicsDevice gd = GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .getDefaultScreenDevice();
+        setupSafeFullScreen();
 
-        gd.setFullScreenWindow(this);
         setVisible(true);
         playAppleMusicPlaylist();
+    }
+
+    private void setupSafeFullScreen() {
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+        setSize(screenSize.width, screenSize.height);
+        setLocation(0, 0);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
 
     private void playAppleMusicPlaylist() {
@@ -153,6 +159,55 @@ public class GameLauncher extends JFrame {
         }
     }
 
+    private void showGameTutorial() {
+        JOptionPane.showMessageDialog(
+            this,
+            "遊戲教學\n\n" +
+            "1. 陸地是主要中樞，可以前往淺海、深海、任務大廳、水族館、商店與沙灘。\n\n" +
+            "2. 淺海適合一開始練習捕魚，深海魚類價值較高，但也更危險。\n\n" +
+            "3. 捕到的魚可以賣錢，也可以放進水族館收藏。\n\n" +
+            "4. 任務大廳可以接取任務，完成任務後可以獲得金幣獎勵。\n\n" +
+            "5. 裝備店可以升級氧氣瓶、潛水衣與背包，讓你探索更久、帶更多魚。\n\n" +
+            "6. 按 ESC 可以從大多數場景返回陸地。",
+            "遊戲教學",
+            JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    private void showTutorialOnce() {
+        if (tutorialShown) {
+            return;
+        }
+
+        tutorialShown = true;
+
+        SwingUtilities.invokeLater(() -> {
+            showGameTutorial();
+
+            if (landPanel != null) {
+                landPanel.requestFocusInWindow();
+            }
+        });
+    }
+
+    private void startAquariumSafely() {
+        if (aquariumPanel == null) {
+            return;
+        }
+
+        try {
+            aquariumPanel.getClass().getMethod("startAquarium").invoke(aquariumPanel);
+        } catch (Exception e1) {
+            try {
+                java.lang.reflect.Method method = aquariumPanel.getClass().getDeclaredMethod("startAquarium");
+                method.setAccessible(true);
+                method.invoke(aquariumPanel);
+            } catch (Exception e2) {
+                System.out.println("Aquarium startAquarium() not found or failed: " + e2.getMessage());
+            }
+        }
+    }
+
     private void showScreen(String screenName) {
         currentScreen = screenName;
         cardLayout.show(mainPanel, screenName);
@@ -195,16 +250,9 @@ public class GameLauncher extends JFrame {
 
         stopAppleMusic();
 
-        GraphicsDevice gd = GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .getDefaultScreenDevice();
-
-        gd.setFullScreenWindow(null);
-
         dispose();
         System.exit(0);
     }
-    
 
     private void createGamePanels() {
         mainPanel.removeAll();
@@ -263,7 +311,7 @@ public class GameLauncher extends JFrame {
                 });
             },
             e -> {
-                hideMissionHud();
+                showMissionHud();
                 showScreen("QuestHallScreen");
 
                 SwingUtilities.invokeLater(() -> {
@@ -292,6 +340,7 @@ public class GameLauncher extends JFrame {
                 showScreen("AquariumScreen");
 
                 SwingUtilities.invokeLater(() -> {
+                    startAquariumSafely();
                     aquariumPanel.requestFocusInWindow();
                 });
             },
@@ -335,6 +384,7 @@ public class GameLauncher extends JFrame {
         InventoryManager.saveGame();
 
         gameStarted = true;
+        tutorialShown = false;
 
         createGamePanels();
 
@@ -342,7 +392,11 @@ public class GameLauncher extends JFrame {
         showScreen("LandScreen");
 
         SwingUtilities.invokeLater(() -> {
-            landPanel.requestFocusInWindow();
+            showTutorialOnce();
+
+            if (landPanel != null) {
+                landPanel.requestFocusInWindow();
+            }
         });
     }
 
@@ -562,4 +616,4 @@ public class GameLauncher extends JFrame {
         System.setProperty("sun.java2d.uiScale", "1.0");
         SwingUtilities.invokeLater(() -> new GameLauncher());
     }
-}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+}
